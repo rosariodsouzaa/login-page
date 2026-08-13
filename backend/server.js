@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2");
@@ -10,12 +11,12 @@ app.use(express.json());
 
 // MySQL connection
 const db = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "",
-  database: "login_app"
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT
 });
-
 // Test MySQL connection
 db.connect((err) => {
   if (err) {
@@ -137,8 +138,8 @@ app.post("/api/login", async (req, res) => {
 });
 
 // Start server
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on port ${PORT}`);
 });
