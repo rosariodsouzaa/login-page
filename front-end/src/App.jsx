@@ -1,16 +1,22 @@
-
 import { useState } from "react";
 import axios from "axios";
 import "./App.css";
+
+const API_URL = "https://login-page-phi-sepia.vercel.app";
 
 function App() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
 
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [registerMessage, setRegisterMessage] = useState("");
+
+  const [otpRequired, setOtpRequired] = useState(false);
+  const [otpMessage, setOtpMessage] = useState("");
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
 
   // ==================== VALIDATION ====================
 
@@ -22,7 +28,6 @@ function App() {
     return /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(email);
   };
 
-  // Individual password checks
   const passwordChecks = {
     length: password.length >= 8,
     uppercase: /[A-Z]/.test(password),
@@ -45,6 +50,7 @@ function App() {
 
   const handleRegister = async () => {
     setRegisterMessage("");
+    setError("");
 
     if (!name || !email || !password) {
       setRegisterMessage("Please fill all fields");
@@ -72,7 +78,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        "https://login-page-phi-sepia.vercel.app/api/register",
+        `${API_URL}/api/register`,
         {
           name,
           email,
@@ -85,6 +91,7 @@ function App() {
       setName("");
       setEmail("");
       setPassword("");
+
     } catch (error) {
       console.log("REGISTER ERROR:", error);
       console.log("SERVER RESPONSE:", error.response?.data);
@@ -99,6 +106,7 @@ function App() {
 
   const handleLogin = async () => {
     setError("");
+    setOtpMessage("");
 
     if (!email || !password) {
       setError("Please enter email and password");
@@ -112,20 +120,90 @@ function App() {
 
     try {
       const response = await axios.post(
-        "https://login-page-phi-sepia.vercel.app/api/login",
+        `${API_URL}/api/login`,
         {
           email,
           password,
         }
       );
 
-      setError(response.data.message);
+      console.log("LOGIN RESPONSE:", response.data);
+
+      if (response.data.requiresOTP) {
+        setOtpRequired(true);
+        setOtp("");
+        setError("");
+        setOtpMessage(
+          "OTP generated. Check the backend console."
+        );
+      } else {
+        setError(response.data.message);
+      }
+
     } catch (error) {
       console.log("LOGIN ERROR:", error);
 
       setError(
         error.response?.data?.message || "Login failed"
       );
+    }
+  };
+
+  // ==================== VERIFY OTP ====================
+
+  const handleVerifyOTP = async () => {
+    setOtpMessage("");
+    setError("");
+
+    if (!otp) {
+      setOtpMessage("Please enter the OTP");
+      return;
+    }
+
+    if (!/^\d{6}$/.test(otp)) {
+      setOtpMessage("OTP must be exactly 6 digits");
+      return;
+    }
+
+    try {
+      setVerifyingOtp(true);
+
+      const response = await axios.post(
+        `${API_URL}/api/verify-otp`,
+        {
+          email,
+          otp,
+        }
+      );
+
+      console.log("OTP RESPONSE:", response.data);
+
+      if (response.data.success) {
+        // Store user information temporarily
+        if (response.data.user) {
+          localStorage.setItem(
+            "user",
+            JSON.stringify(response.data.user)
+          );
+        }
+
+        // Redirect to dashboard
+        window.location.href = "/dashboard";
+      } else {
+        setOtpMessage(
+          response.data.message || "Invalid OTP"
+        );
+      }
+
+    } catch (error) {
+      console.log("OTP VERIFICATION ERROR:", error);
+
+      setOtpMessage(
+        error.response?.data?.message ||
+        "OTP verification failed"
+      );
+    } finally {
+      setVerifyingOtp(false);
     }
   };
 
@@ -136,172 +214,243 @@ function App() {
       <div className="login-box">
 
         <h1>Welcome Back</h1>
-        <p>Login to your account</p>
 
-        {/* NAME */}
+        {!otpRequired ? (
+          <>
+            <p>Login to your account</p>
 
-        <label>Name</label>
+            {/* NAME */}
 
-        <input
-          type="text"
-          placeholder="Enter your name"
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setRegisterMessage("");
-          }}
-        />
+            <label>Name</label>
 
-        {name && !validateName(name) && (
-          <p className="validation-error">
-             Name should contain only letters and spaces
-          </p>
-        )}
+            <input
+              type="text"
+              placeholder="Enter your name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setRegisterMessage("");
+              }}
+            />
 
-        {name && validateName(name) && (
-          <p className="validation-success">
-             Name is valid
-          </p>
-        )}
+            {name && !validateName(name) && (
+              <p className="validation-error">
+                ❌ Name should contain only letters and spaces
+              </p>
+            )}
 
-        {/* EMAIL */}
+            {name && validateName(name) && (
+              <p className="validation-success">
+                ✅ Name is valid
+              </p>
+            )}
 
-        <label>Email</label>
+            {/* EMAIL */}
 
-        <input
-          type="email"
-          placeholder="Enter your email"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            setError("");
-            setRegisterMessage("");
-          }}
-        />
+            <label>Email</label>
 
-        {email && !validateEmail(email) && (
-          <p className="validation-error">
-             Please enter a valid email address
-          </p>
-        )}
+            <input
+              type="email"
+              placeholder="Enter your email"
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError("");
+                setRegisterMessage("");
+              }}
+            />
 
-        {email && validateEmail(email) && (
-          <p className="validation-success">
-             Email is valid
-          </p>
-        )}
+            {email && !validateEmail(email) && (
+              <p className="validation-error">
+                ❌ Please enter a valid email address
+              </p>
+            )}
 
-        {/* PASSWORD */}
+            {email && validateEmail(email) && (
+              <p className="validation-success">
+                ✅ Email is valid
+              </p>
+            )}
 
-        <label>Password</label>
+            {/* PASSWORD */}
 
-        <div className="password-container">
+            <label>Password</label>
 
-          <input
-            type={showPassword ? "text" : "password"}
-            placeholder="Enter your password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setError("");
-              setRegisterMessage("");
-            }}
-          />
+            <div className="password-container">
 
-          <button
-            type="button"
-            className="show-password"
-            onClick={() => setShowPassword(!showPassword)}
-          >
-            {showPassword ? "Hide" : "Show"}
-          </button>
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setError("");
+                  setRegisterMessage("");
+                }}
+              />
 
-        </div>
+              <button
+                type="button"
+                className="show-password"
+                onClick={() =>
+                  setShowPassword(!showPassword)
+                }
+              >
+                {showPassword ? "Hide" : "Show"}
+              </button>
 
-        {/* PASSWORD REQUIREMENTS */}
+            </div>
 
-        {password && (
-          <div className="password-requirements">
+            {/* PASSWORD REQUIREMENTS */}
 
-            <p className={
-              passwordChecks.length
-                ? "validation-success"
-                : "validation-error"
-            }>
-              {passwordChecks.length ? "✅" : "❌"} At least 8 characters
+            {password && (
+              <div className="password-requirements">
+
+                <p
+                  className={
+                    passwordChecks.length
+                      ? "validation-success"
+                      : "validation-error"
+                  }
+                >
+                  {passwordChecks.length ? "✅" : "❌"} At least 8 characters
+                </p>
+
+                <p
+                  className={
+                    passwordChecks.uppercase
+                      ? "validation-success"
+                      : "validation-error"
+                  }
+                >
+                  {passwordChecks.uppercase ? "✅" : "❌"} One uppercase letter
+                </p>
+
+                <p
+                  className={
+                    passwordChecks.lowercase
+                      ? "validation-success"
+                      : "validation-error"
+                  }
+                >
+                  {passwordChecks.lowercase ? "✅" : "❌"} One lowercase letter
+                </p>
+
+                <p
+                  className={
+                    passwordChecks.number
+                      ? "validation-success"
+                      : "validation-error"
+                  }
+                >
+                  {passwordChecks.number ? "✅" : "❌"} One number
+                </p>
+
+                <p
+                  className={
+                    passwordChecks.special
+                      ? "validation-success"
+                      : "validation-error"
+                  }
+                >
+                  {passwordChecks.special ? "✅" : "❌"} One special character
+                </p>
+
+              </div>
+            )}
+
+            {/* LOGIN ERROR */}
+
+            {error && (
+              <p className="error">
+                {error}
+              </p>
+            )}
+
+            {/* LOGIN */}
+
+            <button onClick={handleLogin}>
+              Login
+            </button>
+
+            {/* REGISTER */}
+
+            <button
+              onClick={handleRegister}
+              disabled={
+                !name ||
+                !email ||
+                !password ||
+                !validateName(name) ||
+                !validateEmail(email) ||
+                !validatePassword(password)
+              }
+            >
+              Register
+            </button>
+
+            {/* REGISTER MESSAGE */}
+
+            {registerMessage && (
+              <p>
+                {registerMessage}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            {/* ==================== OTP SCREEN ==================== */}
+
+            <p>
+              Enter the 6-digit OTP generated for your login.
             </p>
 
-            <p className={
-              passwordChecks.uppercase
-                ? "validation-success"
-                : "validation-error"
-            }>
-              {passwordChecks.uppercase ? "✅" : "❌"} One uppercase letter
-            </p>
+            <label>OTP</label>
 
-            <p className={
-              passwordChecks.lowercase
-                ? "validation-success"
-                : "validation-error"
-            }>
-              {passwordChecks.lowercase ? "✅" : "❌"} One lowercase letter
-            </p>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength="6"
+              placeholder="Enter 6-digit OTP"
+              value={otp}
+              onChange={(e) => {
+                const value = e.target.value
+                  .replace(/\D/g, "")
+                  .slice(0, 6);
 
-            <p className={
-              passwordChecks.number
-                ? "validation-success"
-                : "validation-error"
-            }>
-              {passwordChecks.number ? "✅" : "❌"} One number
-            </p>
+                setOtp(value);
+                setOtpMessage("");
+              }}
+            />
 
-            <p className={
-              passwordChecks.special
-                ? "validation-success"
-                : "validation-error"
-            }>
-              {passwordChecks.special ? "✅" : "❌"} One special character
-            </p>
+            {otpMessage && (
+              <p className="error">
+                {otpMessage}
+              </p>
+            )}
 
-          </div>
-        )}
+            <button
+              onClick={handleVerifyOTP}
+              disabled={verifyingOtp}
+            >
+              {verifyingOtp
+                ? "Verifying..."
+                : "Verify OTP"}
+            </button>
 
-        {/* LOGIN MESSAGE */}
+            <button
+              type="button"
+              onClick={() => {
+                setOtpRequired(false);
+                setOtp("");
+                setOtpMessage("");
+                setError("");
+              }}
+            >
+              Back to Login
+            </button>
 
-        {error && (
-          <p className="error">
-            {error}
-          </p>
-        )}
-
-        {/* LOGIN */}
-
-        <button onClick={handleLogin}>
-          Login
-        </button>
-
-        {/* REGISTER */}
-
-        <button
-          onClick={handleRegister}
-          disabled={
-            !name ||
-            !email ||
-            !password ||
-            !validateName(name) ||
-            !validateEmail(email) ||
-            !validatePassword(password)
-          }
-        >
-          Register
-        </button>
-
-        {/* REGISTER MESSAGE */}
-
-        {registerMessage && (
-          <p>
-            {registerMessage}
-          </p>
+          </>
         )}
 
       </div>
@@ -310,4 +459,3 @@ function App() {
 }
 
 export default App;
-
