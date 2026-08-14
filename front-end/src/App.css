@@ -175,3 +175,31 @@
   color: #667eea !important;
   font-size: 13px !important;
 }
+
+.validation-error {
+  color: #d93025;
+  font-size: 13px;
+  margin: 4px 0 8px;
+}
+
+.validation-success {
+  color: #188038;
+  font-size: 13px;
+  margin: 4px 0 8px;
+}
+
+.password-requirements {
+  margin: 5px 0 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #f7f7f7;
+}
+
+.password-requirements p {
+  margin: 4px 0;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
