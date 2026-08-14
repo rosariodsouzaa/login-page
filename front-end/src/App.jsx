@@ -21,7 +21,7 @@ function App() {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/register",
+        "https://login-page-phi-sepia.vercel.app/api/register",
         {
           name: name,
           email: email,
@@ -55,7 +55,7 @@ function App() {
 
   try {
     const response = await axios.post(
-      "http://localhost:5000/api/login",
+      "https://login-page-phi-sepia.vercel.app/api/login",
       {
         email: email,
         password: password
