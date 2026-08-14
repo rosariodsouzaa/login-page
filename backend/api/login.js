@@ -1,54 +1,118 @@
-const mysql = require("mysql2/promise");
-const bcrypt = require("bcrypt");
+// =========================
+// GENERATE OTP
+// =========================
 
-module.exports = async (req, res) => {
-  if (req.method !== "POST") {
-    return res.status(405).json({
-      message: "Method not allowed"
-    });
-  }
+const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-  const { name, email, password } = req.body;
+const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-  if (!name || !email || !password) {
+// Remove any previous OTP for this email
+await pool.query(
+  "DELETE FROM otps WHERE email = $1",
+  [email]
+);
+
+// Store new OTP in Neon
+await pool.query(
+  `INSERT INTO otps (email, otp, expires_at)
+   VALUES ($1, $2, $3)`,
+  [email, otp, expiresAt]
+);
+
+// Show OTP in backend console
+console.log(`OTP for ${email}: ${otp}`);
+
+res.json({
+  message: "OTP generated. Please enter the OTP.",
+  requiresOTP: true
+});
+
+// ==================== VERIFY OTP ====================
+
+app.post("/api/verify-otp", async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
     return res.status(400).json({
-      message: "All fields are required"
+      success: false,
+      message: "Email and OTP are required"
     });
   }
 
   try {
-    const db = await mysql.createConnection({
-      host: process.env.DB_HOST,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      database: process.env.DB_NAME,
-      port: process.env.DB_PORT
-    });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    await db.execute(
-      "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
-      [name, email, hashedPassword]
+    const result = await pool.query(
+      `SELECT * FROM otps
+       WHERE email = $1
+       ORDER BY id DESC
+       LIMIT 1`,
+      [email]
     );
 
-    await db.end();
-
-    res.status(201).json({
-      message: "User registered successfully"
-    });
-
-  } catch (error) {
-    console.error(error);
-
-    if (error.code === "ER_DUP_ENTRY") {
-      return res.status(409).json({
-        message: "Email is already registered"
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: "OTP not found or expired"
       });
     }
 
+    const storedOtp = result.rows[0];
+
+    // Check expiry
+    if (new Date() > new Date(storedOtp.expires_at)) {
+      await pool.query(
+        "DELETE FROM otps WHERE email = $1",
+        [email]
+      );
+
+      return res.status(401).json({
+        success: false,
+        message: "OTP has expired"
+      });
+    }
+
+    // Check OTP
+    if (String(otp) !== String(storedOtp.otp)) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid OTP"
+      });
+    }
+
+    // OTP correct → delete it
+    await pool.query(
+      "DELETE FROM otps WHERE email = $1",
+      [email]
+    );
+
+    // Get user
+    const userResult = await pool.query(
+      `SELECT id, name, email
+       FROM users
+       WHERE email = $1`,
+      [email]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    console.log(`OTP verified successfully for ${email}`);
+
+    res.json({
+      success: true,
+      message: "OTP verified successfully",
+      user: userResult.rows[0]
+    });
+
+  } catch (error) {
+    console.error("OTP verification error:", error);
+
     res.status(500).json({
-      message: "Failed to register user"
+      success: false,
+      message: "Server error"
     });
   }
-};
+});

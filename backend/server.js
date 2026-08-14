@@ -1,3 +1,4 @@
+
 require("dotenv").config();
 
 const express = require("express");
@@ -10,7 +11,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Neon PostgreSQL connection
+// ==================== NEON POSTGRESQL ====================
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
@@ -40,6 +42,7 @@ app.post("/api/register", async (req, res) => {
   }
 
   try {
+
     // Check if email already exists
     const existingUser = await pool.query(
       "SELECT id FROM users WHERE email = $1",
@@ -67,6 +70,7 @@ app.post("/api/register", async (req, res) => {
     });
 
   } catch (error) {
+
     console.error("Registration error:", error);
 
     res.status(500).json({
@@ -79,6 +83,7 @@ app.post("/api/register", async (req, res) => {
 // ==================== LOGIN ====================
 
 app.post("/api/login", async (req, res) => {
+
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -88,12 +93,14 @@ app.post("/api/login", async (req, res) => {
   }
 
   try {
-    // Find user by email
+
+    // Find user
     const result = await pool.query(
       "SELECT * FROM users WHERE email = $1",
       [email]
     );
 
+    // User doesn't exist
     if (result.rows.length === 0) {
       return res.status(401).json({
         message: "Invalid email or password"
@@ -102,7 +109,7 @@ app.post("/api/login", async (req, res) => {
 
     const user = result.rows[0];
 
-    // Compare password
+    // Check password
     const passwordMatch = await bcrypt.compare(
       password,
       user.password
@@ -114,8 +121,176 @@ app.post("/api/login", async (req, res) => {
       });
     }
 
-    res.status(200).json({
-      message: "Login successful",
+
+    // =========================
+    // GENERATE OTP
+    // =========================
+
+    const otp = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+
+    const expiresAt = new Date(
+      Date.now() + 5 * 60 * 1000
+    );
+
+
+    // Delete old OTP for this email
+    await pool.query(
+      "DELETE FROM otps WHERE email = $1",
+      [email]
+    );
+
+
+    // Store OTP in Neon
+    await pool.query(
+      `INSERT INTO otps
+       (email, otp, expires_at)
+       VALUES ($1, $2, $3)`,
+      [email, otp, expiresAt]
+    );
+
+
+    // Show OTP in backend console
+    console.log(
+      `OTP for ${email}: ${otp}`
+    );
+
+
+    // Tell frontend OTP is required
+    res.json({
+      message: "OTP generated. Please enter the OTP.",
+      requiresOTP: true
+    });
+
+  } catch (error) {
+
+    console.error("Login error:", error);
+
+    res.status(500).json({
+      message: "Server error"
+    });
+  }
+});
+
+
+// ==================== VERIFY OTP ====================
+
+app.post("/api/verify-otp", async (req, res) => {
+
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Email and OTP are required"
+    });
+  }
+
+  try {
+
+    // Get latest OTP
+    const result = await pool.query(
+      `SELECT *
+       FROM otps
+       WHERE email = $1
+       ORDER BY id DESC
+       LIMIT 1`,
+      [email]
+    );
+
+
+    // OTP doesn't exist
+    if (result.rows.length === 0) {
+
+      return res.status(401).json({
+        success: false,
+        message: "OTP not found or expired"
+      });
+    }
+
+
+    const storedOtp = result.rows[0];
+
+
+    // =========================
+    // CHECK EXPIRATION
+    // =========================
+
+    if (
+      new Date() >
+      new Date(storedOtp.expires_at)
+    ) {
+
+      await pool.query(
+        "DELETE FROM otps WHERE email = $1",
+        [email]
+      );
+
+      return res.status(401).json({
+        success: false,
+        message: "OTP has expired"
+      });
+    }
+
+
+    // =========================
+    // CHECK OTP
+    // =========================
+
+    if (
+      String(otp) !==
+      String(storedOtp.otp)
+    ) {
+
+      return res.status(401).json({
+        success: false,
+        message: "Invalid OTP"
+      });
+    }
+
+
+    // =========================
+    // OTP CORRECT
+    // =========================
+
+    // Delete used OTP
+    await pool.query(
+      "DELETE FROM otps WHERE email = $1",
+      [email]
+    );
+
+
+    // Get user information
+    const userResult = await pool.query(
+      `SELECT id, name, email
+       FROM users
+       WHERE email = $1`,
+      [email]
+    );
+
+
+    if (userResult.rows.length === 0) {
+
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+
+    const user = userResult.rows[0];
+
+
+    console.log(
+      `OTP verified successfully for ${email}`
+    );
+
+
+    // Send user information to frontend
+    res.json({
+      success: true,
+      message: "OTP verified successfully",
       user: {
         id: user.id,
         name: user.name,
@@ -124,10 +299,15 @@ app.post("/api/login", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Login error:", error);
+
+    console.error(
+      "OTP verification error:",
+      error
+    );
 
     res.status(500).json({
-      message: "Database error"
+      success: false,
+      message: "Server error"
     });
   }
 });
@@ -137,6 +317,26 @@ app.post("/api/login", async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
+const server = app.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
+    console.log(
+      `Server running on port ${PORT}`
+    );
+  }
+);
+
+
+// ==================== SERVER ERRORS ====================
+
+server.on("close", () => {
+  console.log("SERVER CLOSED");
+});
+
+server.on("error", (err) => {
+  console.error(
+    "SERVER ERROR:",
+    err
+  );
 });
