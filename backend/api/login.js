@@ -24,7 +24,8 @@ console.log(`OTP for ${email}: ${otp}`);
 
 res.json({
   message: "OTP generated. Please enter the OTP.",
-  requiresOTP: true
+  requiresOTP: true,
+  otp: otp
 });
 
 // ==================== VERIFY OTP ====================
