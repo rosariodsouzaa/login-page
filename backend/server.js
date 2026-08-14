@@ -1,7 +1,7 @@
 require("dotenv").config();
 
 const express = require("express");
-const mysql = require("mysql2");
+const { Pool } = require("pg");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 
@@ -9,39 +9,27 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
-const db = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT
-});
 
-db.connect((err) => {
-  if (err) {
-    console.error("MySQL connection failed:", err);
-  } else {
-    console.log("Connected to Aiven MySQL!");
+// Neon PostgreSQL connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
   }
 });
-// Test MySQL connection
-db.connect((err) => {
-  if (err) {
+
+pool.connect()
+  .then((client) => {
+    console.log("Connected to Neon PostgreSQL");
+    client.release();
+  })
+  .catch((err) => {
     console.error("Database connection failed:", err);
-    return;
-  }
-
-  console.log("Connected to MySQL");
-});
-
-// Test API
-app.get("/", (req, res) => {
-  res.json({
-    message: "Backend API is running"
   });
-});
 
-// REGISTER
+
+// ==================== REGISTER ====================
+
 app.post("/api/register", async (req, res) => {
   const { name, email, password } = req.body;
 
@@ -52,47 +40,44 @@ app.post("/api/register", async (req, res) => {
   }
 
   try {
+    // Check if email already exists
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({
+        message: "Email is already registered"
+      });
+    }
+
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const sql = `
-      INSERT INTO users (name, email, password)
-      VALUES (?, ?, ?)
-    `;
-
-    db.query(
-      sql,
-      [name, email, hashedPassword],
-      (err, result) => {
-if (err) {
-  console.error("Registration database error:", err);
-
-  if (err.code === "ER_DUP_ENTRY") {
-    return res.status(409).json({
-      message: "Email is already registered"
-    });
-  }
-
-  return res.status(500).json({
-    message: "Failed to register user"
-  });
-}
-
-        res.status(201).json({
-          message: "User registered successfully"
-        });
-      }
+    // Insert user
+    await pool.query(
+      `INSERT INTO users (name, email, password)
+       VALUES ($1, $2, $3)`,
+      [name, email, hashedPassword]
     );
+
+    res.status(201).json({
+      message: "User registered successfully"
+    });
 
   } catch (error) {
     console.error("Registration error:", error);
 
     res.status(500).json({
-      message: "Server error"
+      message: "Failed to register user"
     });
   }
 });
 
-// LOGIN
+
+// ==================== LOGIN ====================
+
 app.post("/api/login", async (req, res) => {
   const { email, password } = req.body;
 
@@ -102,26 +87,22 @@ app.post("/api/login", async (req, res) => {
     });
   }
 
-  const sql = "SELECT * FROM users WHERE email = ?";
+  try {
+    // Find user by email
+    const result = await pool.query(
+      "SELECT * FROM users WHERE email = $1",
+      [email]
+    );
 
-  db.query(sql, [email], async (err, results) => {
-
-    if (err) {
-      console.error("Login database error:", err);
-
-      return res.status(500).json({
-        message: "Database error"
-      });
-    }
-
-    if (results.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(401).json({
         message: "Invalid email or password"
       });
     }
 
-    const user = results[0];
+    const user = result.rows[0];
 
+    // Compare password
     const passwordMatch = await bcrypt.compare(
       password,
       user.password
@@ -133,7 +114,7 @@ app.post("/api/login", async (req, res) => {
       });
     }
 
-    res.json({
+    res.status(200).json({
       message: "Login successful",
       user: {
         id: user.id,
@@ -141,10 +122,19 @@ app.post("/api/login", async (req, res) => {
         email: user.email
       }
     });
-  });
+
+  } catch (error) {
+    console.error("Login error:", error);
+
+    res.status(500).json({
+      message: "Database error"
+    });
+  }
 });
 
-// Start server
+
+// ==================== START SERVER ====================
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, "0.0.0.0", () => {
