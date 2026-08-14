@@ -10,6 +10,12 @@ function App() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [registerMessage, setRegisterMessage] = useState("");
+  const validateEmail = (email) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+  const validatePassword = (password) => {
+  return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/.test(password);
+};
 
   const handleRegister = async () => {
     setRegisterMessage("");
@@ -18,6 +24,17 @@ function App() {
       setRegisterMessage("Please fill all fields");
       return;
     }
+    if (!validateEmail(email)) {
+  setRegisterMessage("Please enter a valid email address");
+  return;
+}
+
+if (!validatePassword(password)) {
+  setRegisterMessage(
+    "Password must be at least 8 characters and contain uppercase, lowercase, number and special character"
+  );
+  return;
+}
 
     try {
       const response = await axios.post(
