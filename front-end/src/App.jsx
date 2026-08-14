@@ -1,22 +1,26 @@
+
 import { useState } from "react";
 import axios from "axios";
 import "./App.css";
 
-const API_URL = "https://login-page-phi-sepia.vercel.app";
-
 function App() {
+  const API_URL = "https://login-page-phi-sepia.vercel.app";
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [otp, setOtp] = useState("");
+  const [showOtp, setShowOtp] = useState(false);
+
+  const [showPassword, setShowPassword] = useState(false);
 
   const [error, setError] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [registerMessage, setRegisterMessage] = useState("");
-
-  const [otpRequired, setOtpRequired] = useState(false);
   const [otpMessage, setOtpMessage] = useState("");
-  const [verifyingOtp, setVerifyingOtp] = useState(false);
+
+  const [loggedInUser, setLoggedInUser] = useState(null);
+
 
   // ==================== VALIDATION ====================
 
@@ -46,11 +50,11 @@ function App() {
     );
   };
 
+
   // ==================== REGISTER ====================
 
   const handleRegister = async () => {
     setRegisterMessage("");
-    setError("");
 
     if (!name || !email || !password) {
       setRegisterMessage("Please fill all fields");
@@ -65,7 +69,9 @@ function App() {
     }
 
     if (!validateEmail(email)) {
-      setRegisterMessage("Please enter a valid email address");
+      setRegisterMessage(
+        "Please enter a valid email address"
+      );
       return;
     }
 
@@ -94,13 +100,18 @@ function App() {
 
     } catch (error) {
       console.log("REGISTER ERROR:", error);
-      console.log("SERVER RESPONSE:", error.response?.data);
+      console.log(
+        "SERVER RESPONSE:",
+        error.response?.data
+      );
 
       setRegisterMessage(
-        error.response?.data?.message || "Registration failed"
+        error.response?.data?.message ||
+        "Registration failed"
       );
     }
   };
+
 
   // ==================== LOGIN ====================
 
@@ -129,29 +140,42 @@ function App() {
 
       console.log("LOGIN RESPONSE:", response.data);
 
+      // OTP required
       if (response.data.requiresOTP) {
-        setOtpRequired(true);
-        setOtp("");
-        setError("");
-        setOtpMessage(
-          "OTP generated. Check the backend console."
+
+        // Show OTP in browser console
+        console.log(
+          "Generated OTP:",
+          response.data.otp
         );
-      } else {
-        setError(response.data.message);
+
+        setShowOtp(true);
+
+        setOtpMessage(
+          "OTP generated. Check the browser console."
+        );
+
+        return;
       }
 
+      setError(response.data.message);
+
     } catch (error) {
+
       console.log("LOGIN ERROR:", error);
 
       setError(
-        error.response?.data?.message || "Login failed"
+        error.response?.data?.message ||
+        "Login failed"
       );
     }
   };
 
+
   // ==================== VERIFY OTP ====================
 
   const handleVerifyOTP = async () => {
+
     setOtpMessage("");
     setError("");
 
@@ -160,13 +184,12 @@ function App() {
       return;
     }
 
-    if (!/^\d{6}$/.test(otp)) {
-      setOtpMessage("OTP must be exactly 6 digits");
+    if (otp.length !== 6) {
+      setOtpMessage("OTP must contain 6 digits");
       return;
     }
 
     try {
-      setVerifyingOtp(true);
 
       const response = await axios.post(
         `${API_URL}/api/verify-otp`,
@@ -176,50 +199,146 @@ function App() {
         }
       );
 
-      console.log("OTP RESPONSE:", response.data);
+      console.log(
+        "OTP VERIFICATION:",
+        response.data
+      );
 
       if (response.data.success) {
-        // Store user information temporarily
-        if (response.data.user) {
-          localStorage.setItem(
-            "user",
-            JSON.stringify(response.data.user)
-          );
-        }
 
-        // Redirect to dashboard
-        window.location.href = "/dashboard";
-      } else {
-        setOtpMessage(
-          response.data.message || "Invalid OTP"
-        );
+        setLoggedInUser(response.data.user);
+
+        setShowOtp(false);
+
+        setOtp("");
+
+        setOtpMessage("");
+
       }
 
     } catch (error) {
-      console.log("OTP VERIFICATION ERROR:", error);
+
+      console.log(
+        "OTP ERROR:",
+        error
+      );
 
       setOtpMessage(
         error.response?.data?.message ||
         "OTP verification failed"
       );
-    } finally {
-      setVerifyingOtp(false);
     }
   };
+
+
+  // ==================== DASHBOARD ====================
+
+  if (loggedInUser) {
+
+    return (
+      <div className="login-container">
+
+        <div className="login-box">
+
+          <h1>Dashboard</h1>
+
+          <p>
+            Welcome, {loggedInUser.name}! 🎉
+          </p>
+
+          <p>
+            You have successfully logged in.
+          </p>
+
+          <p>
+            <strong>Email:</strong>{" "}
+            {loggedInUser.email}
+          </p>
+
+          <button
+            onClick={() => {
+              setLoggedInUser(null);
+              setEmail("");
+              setPassword("");
+            }}
+          >
+            Logout
+          </button>
+
+        </div>
+
+      </div>
+    );
+  }
+
 
   // ==================== UI ====================
 
   return (
     <div className="login-container">
+
       <div className="login-box">
 
         <h1>Welcome Back</h1>
 
-        {!otpRequired ? (
-          <>
-            <p>Login to your account</p>
+        <p>
+          {showOtp
+            ? "Enter the OTP to continue"
+            : "Login to your account"}
+        </p>
 
-            {/* NAME */}
+
+        {/* ================= OTP SCREEN ================= */}
+
+        {showOtp ? (
+
+          <>
+            <label>OTP</label>
+
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength="6"
+              placeholder="Enter 6-digit OTP"
+              value={otp}
+              onChange={(e) => {
+
+                const value =
+                  e.target.value.replace(/\D/g, "");
+
+                setOtp(value);
+                setOtpMessage("");
+              }}
+            />
+
+            {otpMessage && (
+              <p className="error">
+                {otpMessage}
+              </p>
+            )}
+
+            <button onClick={handleVerifyOTP}>
+              Verify OTP
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setShowOtp(false);
+                setOtp("");
+                setOtpMessage("");
+              }}
+            >
+              Back to Login
+            </button>
+
+          </>
+
+        ) : (
+
+          <>
+
+            {/* ================= NAME ================= */}
 
             <label>Name</label>
 
@@ -245,7 +364,8 @@ function App() {
               </p>
             )}
 
-            {/* EMAIL */}
+
+            {/* ================= EMAIL ================= */}
 
             <label>Email</label>
 
@@ -272,14 +392,19 @@ function App() {
               </p>
             )}
 
-            {/* PASSWORD */}
+
+            {/* ================= PASSWORD ================= */}
 
             <label>Password</label>
 
             <div className="password-container">
 
               <input
-                type={showPassword ? "text" : "password"}
+                type={
+                  showPassword
+                    ? "text"
+                    : "password"
+                }
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => {
@@ -296,70 +421,80 @@ function App() {
                   setShowPassword(!showPassword)
                 }
               >
-                {showPassword ? "Hide" : "Show"}
+                {showPassword
+                  ? "Hide"
+                  : "Show"}
               </button>
 
             </div>
 
-            {/* PASSWORD REQUIREMENTS */}
+
+            {/* ================= PASSWORD REQUIREMENTS ================= */}
 
             {password && (
+
               <div className="password-requirements">
 
-                <p
-                  className={
-                    passwordChecks.length
-                      ? "validation-success"
-                      : "validation-error"
-                  }
-                >
-                  {passwordChecks.length ? "✅" : "❌"} At least 8 characters
+                <p className={
+                  passwordChecks.length
+                    ? "validation-success"
+                    : "validation-error"
+                }>
+                  {passwordChecks.length
+                    ? "✅"
+                    : "❌"}{" "}
+                  At least 8 characters
                 </p>
 
-                <p
-                  className={
-                    passwordChecks.uppercase
-                      ? "validation-success"
-                      : "validation-error"
-                  }
-                >
-                  {passwordChecks.uppercase ? "✅" : "❌"} One uppercase letter
+                <p className={
+                  passwordChecks.uppercase
+                    ? "validation-success"
+                    : "validation-error"
+                }>
+                  {passwordChecks.uppercase
+                    ? "✅"
+                    : "❌"}{" "}
+                  One uppercase letter
                 </p>
 
-                <p
-                  className={
-                    passwordChecks.lowercase
-                      ? "validation-success"
-                      : "validation-error"
-                  }
-                >
-                  {passwordChecks.lowercase ? "✅" : "❌"} One lowercase letter
+                <p className={
+                  passwordChecks.lowercase
+                    ? "validation-success"
+                    : "validation-error"
+                }>
+                  {passwordChecks.lowercase
+                    ? "✅"
+                    : "❌"}{" "}
+                  One lowercase letter
                 </p>
 
-                <p
-                  className={
-                    passwordChecks.number
-                      ? "validation-success"
-                      : "validation-error"
-                  }
-                >
-                  {passwordChecks.number ? "✅" : "❌"} One number
+                <p className={
+                  passwordChecks.number
+                    ? "validation-success"
+                    : "validation-error"
+                }>
+                  {passwordChecks.number
+                    ? "✅"
+                    : "❌"}{" "}
+                  One number
                 </p>
 
-                <p
-                  className={
-                    passwordChecks.special
-                      ? "validation-success"
-                      : "validation-error"
-                  }
-                >
-                  {passwordChecks.special ? "✅" : "❌"} One special character
+                <p className={
+                  passwordChecks.special
+                    ? "validation-success"
+                    : "validation-error"
+                }>
+                  {passwordChecks.special
+                    ? "✅"
+                    : "❌"}{" "}
+                  One special character
                 </p>
 
               </div>
             )}
 
-            {/* LOGIN ERROR */}
+
+            {/* ================= LOGIN ERROR ================= */}
 
             {error && (
               <p className="error">
@@ -367,13 +502,15 @@ function App() {
               </p>
             )}
 
-            {/* LOGIN */}
+
+            {/* ================= LOGIN ================= */}
 
             <button onClick={handleLogin}>
               Login
             </button>
 
-            {/* REGISTER */}
+
+            {/* ================= REGISTER ================= */}
 
             <button
               onClick={handleRegister}
@@ -389,71 +526,21 @@ function App() {
               Register
             </button>
 
-            {/* REGISTER MESSAGE */}
+
+            {/* ================= REGISTER MESSAGE ================= */}
 
             {registerMessage && (
               <p>
                 {registerMessage}
               </p>
             )}
-          </>
-        ) : (
-          <>
-            {/* ==================== OTP SCREEN ==================== */}
-
-            <p>
-              Enter the 6-digit OTP generated for your login.
-            </p>
-
-            <label>OTP</label>
-
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength="6"
-              placeholder="Enter 6-digit OTP"
-              value={otp}
-              onChange={(e) => {
-                const value = e.target.value
-                  .replace(/\D/g, "")
-                  .slice(0, 6);
-
-                setOtp(value);
-                setOtpMessage("");
-              }}
-            />
-
-            {otpMessage && (
-              <p className="error">
-                {otpMessage}
-              </p>
-            )}
-
-            <button
-              onClick={handleVerifyOTP}
-              disabled={verifyingOtp}
-            >
-              {verifyingOtp
-                ? "Verifying..."
-                : "Verify OTP"}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setOtpRequired(false);
-                setOtp("");
-                setOtpMessage("");
-                setError("");
-              }}
-            >
-              Back to Login
-            </button>
 
           </>
+
         )}
 
       </div>
+
     </div>
   );
 }
