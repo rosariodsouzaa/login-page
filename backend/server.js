@@ -160,7 +160,8 @@ app.post("/api/login", async (req, res) => {
     // Tell frontend OTP is required
     res.json({
       message: "OTP generated. Please enter the OTP.",
-      requiresOTP: true
+      requiresOTP: true,
+      otp: otp
     });
 
   } catch (error) {
