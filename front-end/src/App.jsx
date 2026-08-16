@@ -4,7 +4,7 @@ import axios from "axios";
 import "./App.css";
 
 function App() {
-  const API_URL = "https://login-page-phi-sepia.vercel.app/";
+  const API_URL = "https://login-page-phi-sepia.vercel.app";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
