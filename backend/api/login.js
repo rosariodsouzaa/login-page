@@ -1,119 +1,77 @@
-// =========================
-// GENERATE OTP
-// =========================
+require("dotenv").config();
 
-const otp = Math.floor(100000 + Math.random() * 900000).toString();
+const { Pool } = require("pg");
+const bcrypt = require("bcrypt");
 
-const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-// Remove any previous OTP for this email
-await pool.query(
-  "DELETE FROM otps WHERE email = $1",
-  [email]
-);
-
-// Store new OTP in Neon
-await pool.query(
-  `INSERT INTO otps (email, otp, expires_at)
-   VALUES ($1, $2, $3)`,
-  [email, otp, expiresAt]
-);
-
-// Show OTP in backend console
-console.log(`OTP for ${email}: ${otp}`);
-
-res.json({
-  message: "OTP generated. Please enter the OTP.",
-  requiresOTP: true,
-  otp: otp
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
-// ==================== VERIFY OTP ====================
+module.exports = async (req, res) => {
 
-app.post("/api/verify-otp", async (req, res) => {
-  const { email, otp } = req.body;
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      message: "Method not allowed"
+    });
+  }
 
-  if (!email || !otp) {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
     return res.status(400).json({
-      success: false,
-      message: "Email and OTP are required"
+      message: "Email and password are required"
     });
   }
 
   try {
+
+    // Find user using email
     const result = await pool.query(
-      `SELECT * FROM otps
-       WHERE email = $1
-       ORDER BY id DESC
-       LIMIT 1`,
+      "SELECT * FROM users WHERE email = $1",
       [email]
     );
 
+    // User does not exist
     if (result.rows.length === 0) {
       return res.status(401).json({
-        success: false,
-        message: "OTP not found or expired"
+        message: "Invalid email or password"
       });
     }
 
-    const storedOtp = result.rows[0];
+    const user = result.rows[0];
 
-    // Check expiry
-    if (new Date() > new Date(storedOtp.expires_at)) {
-      await pool.query(
-        "DELETE FROM otps WHERE email = $1",
-        [email]
-      );
-
-      return res.status(401).json({
-        success: false,
-        message: "OTP has expired"
-      });
-    }
-
-    // Check OTP
-    if (String(otp) !== String(storedOtp.otp)) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid OTP"
-      });
-    }
-
-    // OTP correct → delete it
-    await pool.query(
-      "DELETE FROM otps WHERE email = $1",
-      [email]
+    // Compare entered password with hashed password
+    const passwordMatch = await bcrypt.compare(
+      password,
+      user.password
     );
 
-    // Get user
-    const userResult = await pool.query(
-      `SELECT id, name, email
-       FROM users
-       WHERE email = $1`,
-      [email]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found"
+    if (!passwordMatch) {
+      return res.status(401).json({
+        message: "Invalid email or password"
       });
     }
 
-    console.log(`OTP verified successfully for ${email}`);
-
-    res.json({
+    // Login successful
+    return res.status(200).json({
       success: true,
-      message: "OTP verified successfully",
-      user: userResult.rows[0]
+      message: "Login successful",
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
     });
 
   } catch (error) {
-    console.error("OTP verification error:", error);
 
-    res.status(500).json({
-      success: false,
+    console.error("Login error:", error);
+
+    return res.status(500).json({
       message: "Server error"
     });
   }
-});
+};
