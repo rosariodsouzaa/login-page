@@ -1,137 +1,90 @@
-// =========================
-// GENERATE OTP
-// =========================
+const { Pool } = require("pg");
+const bcrypt = require("bcrypt");
 
-const otp = Math.floor(
-  100000 + Math.random() * 900000
-).toString();
-
-const expiresAt = new Date(
-  Date.now() + 5 * 60 * 1000
-);
-
-const hashedPassword = await bcrypt.hash(
-  password,
-  10
-);
-
-await pool.query(
-  "DELETE FROM otps WHERE email = $1",
-  [email]
-);
-
-await pool.query(
-  `INSERT INTO otps
-   (email, otp, expires_at, name, password)
-   VALUES ($1, $2, $3, $4, $5)`,
-  [
-    email,
-    otp,
-    expiresAt,
-    name,
-    hashedPassword
-  ]
-);
-
-console.log(
-  `Registration OTP for ${email}: ${otp}`
-);
-
-res.json({
-  message: "OTP generated. Please enter the OTP.",
-  requiresOTP: true
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
-// ==================== VERIFY OTP ====================
-app.post(
-  "/api/verify-registration-otp",
-  async (req, res) => {
-    const { email, otp } = req.body;
-
-    if (!email || !otp) {
-      return res.status(400).json({
-        success: false,
-        message: "Email and OTP are required"
-      });
-    }
-
-    try {
-      const result = await pool.query(
-        `SELECT *
-         FROM otps
-         WHERE email = $1
-         ORDER BY id DESC
-         LIMIT 1`,
-        [email]
-      );
-
-      if (result.rows.length === 0) {
-        return res.status(401).json({
-          success: false,
-          message: "OTP not found or expired"
-        });
-      }
-
-      const storedOtp = result.rows[0];
-
-      if (
-        new Date() >
-        new Date(storedOtp.expires_at)
-      ) {
-        await pool.query(
-          "DELETE FROM otps WHERE email = $1",
-          [email]
-        );
-
-        return res.status(401).json({
-          success: false,
-          message: "OTP has expired"
-        });
-      }
-
-      if (
-        String(otp) !==
-        String(storedOtp.otp)
-      ) {
-        return res.status(401).json({
-          success: false,
-          message: "Invalid OTP"
-        });
-      }
-
-      const newUser = await pool.query(
-        `INSERT INTO users
-         (name, email, password)
-         VALUES ($1, $2, $3)
-         RETURNING id, name, email`,
-        [
-          storedOtp.name,
-          storedOtp.email,
-          storedOtp.password
-        ]
-      );
-
-      await pool.query(
-        "DELETE FROM otps WHERE email = $1",
-        [email]
-      );
-
-      res.json({
-        success: true,
-        message: "Registration successful",
-        user: newUser.rows[0]
-      });
-
-    } catch (error) {
-      console.error(
-        "OTP verification error:",
-        error
-      );
-
-      res.status(500).json({
-        success: false,
-        message: "Server error"
-      });
-    }
+module.exports = async (req, res) => {
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      message: "Method not allowed",
+    });
   }
-);
+
+  const { name, email, password } = req.body;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({
+      message: "All fields are required",
+    });
+  }
+
+  try {
+    // Check if the user already exists
+    const existingUser = await pool.query(
+      "SELECT id FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({
+        message: "Email is already registered",
+      });
+    }
+
+    // Generate OTP
+    const otp = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+
+    const expiresAt = new Date(
+      Date.now() + 5 * 60 * 1000
+    );
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(
+      password,
+      10
+    );
+
+    // Delete any old OTP
+    await pool.query(
+      "DELETE FROM otps WHERE email = $1",
+      [email]
+    );
+
+    // Store registration details temporarily
+    await pool.query(
+      `INSERT INTO otps
+       (email, otp, expires_at, name, password)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        email,
+        otp,
+        expiresAt,
+        name,
+        hashedPassword,
+      ]
+    );
+
+    console.log(
+      `Registration OTP for ${email}: ${otp}`
+    );
+
+    return res.status(200).json({
+      message: "OTP generated. Please enter the OTP.",
+      requiresOTP: true,
+    });
+
+  } catch (error) {
+    console.error("Registration error:", error);
+
+    return res.status(500).json({
+      message: "Registration failed",
+    });
+  }
+};
