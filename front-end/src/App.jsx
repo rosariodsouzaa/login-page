@@ -3,7 +3,7 @@ import axios from "axios";
 import "./App.css";
 
 function App() {
-  const API_URL = "https://login-page-phi-sepia.vercel.app";
+  const API_URL = "http://localhost:5000";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -87,13 +87,14 @@ function App() {
       );
 
       if (response.data.requiresOTP) {
-        setShowOtp(true);
+  console.log("Registration OTP:", response.data.otp);
 
-        setOtpMessage(
-          response.data.message ||
-          "OTP generated. Please enter the OTP."
-        );
-      }
+  setShowOtp(true);
+
+  setOtpMessage(
+    response.data.message || "OTP generated. Please enter the OTP."
+  );
+}
 
     } catch (error) {
       setRegisterMessage(

@@ -78,6 +78,7 @@ module.exports = async (req, res) => {
     return res.status(200).json({
       message: "OTP generated. Please enter the OTP.",
       requiresOTP: true,
+      otp:otp
     });
 
   } catch (error) {
