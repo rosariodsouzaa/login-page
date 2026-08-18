@@ -5,6 +5,10 @@ import "./App.css";
 function App() {
   const API_URL = "https://login-page-phi-sepia.vercel.app";
 
+  // =========================
+  // STATE
+  // =========================
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -19,7 +23,12 @@ function App() {
   const [registerMessage, setRegisterMessage] = useState("");
   const [otpMessage, setOtpMessage] = useState("");
 
+  // Stores the currently logged-in user
   const [loggedInUser, setLoggedInUser] = useState(null);
+
+  // =========================
+  // VALIDATION
+  // =========================
 
   const validateName = (name) => {
     return /^[A-Za-z ]+$/.test(name);
@@ -47,8 +56,13 @@ function App() {
     );
   };
 
+  // =========================
+  // REGISTER
+  // =========================
+
   const handleRegister = async () => {
     setRegisterMessage("");
+    setError("");
 
     if (!name || !email || !password) {
       setRegisterMessage("Please fill all fields");
@@ -87,22 +101,29 @@ function App() {
       );
 
       if (response.data.requiresOTP) {
-  console.log("Registration OTP:", response.data.otp);
+        console.log(
+          "Registration OTP:",
+          response.data.otp
+        );
 
-  setShowOtp(true);
+        setShowOtp(true);
 
-  setOtpMessage(
-    response.data.message || "OTP generated. Please enter the OTP."
-  );
-}
-
+        setOtpMessage(
+          response.data.message ||
+            "OTP generated. Please enter the OTP."
+        );
+      }
     } catch (error) {
       setRegisterMessage(
         error.response?.data?.message ||
-        "Registration failed"
+          "Registration failed"
       );
     }
   };
+
+  // =========================
+  // LOGIN
+  // =========================
 
   const handleLogin = async () => {
     setError("");
@@ -127,16 +148,29 @@ function App() {
       );
 
       if (response.data.success) {
-        setLoggedInUser(response.data.user);
-      }
+        // Save JWT token
+        localStorage.setItem(
+          "token",
+          response.data.token
+        );
 
+        // Save logged-in user
+        setLoggedInUser(response.data.user);
+
+        // Clear login messages
+        setError("");
+      }
     } catch (error) {
       setError(
         error.response?.data?.message ||
-        "Login failed"
+          "Login failed"
       );
     }
   };
+
+  // =========================
+  // REGISTRATION OTP
+  // =========================
 
   const handleVerifyOTP = async () => {
     setOtpMessage("");
@@ -161,26 +195,77 @@ function App() {
       );
 
       if (response.data.success) {
+        // Hide OTP screen
         setShowOtp(false);
+
+        // Clear OTP
         setOtp("");
+
+        // Clear registration fields
         setName("");
         setEmail("");
         setPassword("");
 
+        // Go back to login
         setIsRegistering(false);
 
+        // Show success message
         setRegisterMessage(
           "Registration successful. Please login."
         );
       }
-
     } catch (error) {
       setOtpMessage(
         error.response?.data?.message ||
-        "OTP verification failed"
+          "OTP verification failed"
       );
     }
   };
+
+  // =========================
+  // LOGOUT
+  // =========================
+
+  const handleLogout = async () => {
+    const token = localStorage.getItem("token");
+
+    try {
+      // Tell backend to invalidate the JWT session
+      await axios.post(
+        `${API_URL}/api/logout`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+    } catch (error) {
+      console.error(
+        "Logout error:",
+        error
+      );
+    } finally {
+      // Remove JWT from browser
+      localStorage.removeItem("token");
+
+      // Clear logged-in user
+      setLoggedInUser(null);
+
+      // Clear login fields
+      setEmail("");
+      setPassword("");
+
+      // Clear messages
+      setError("");
+      setRegisterMessage("");
+      setOtpMessage("");
+    }
+  };
+
+  // =========================
+  // DASHBOARD
+  // =========================
 
   if (loggedInUser) {
     return (
@@ -202,13 +287,7 @@ function App() {
             {loggedInUser.email}
           </p>
 
-          <button
-            onClick={() => {
-              setLoggedInUser(null);
-              setEmail("");
-              setPassword("");
-            }}
-          >
+          <button onClick={handleLogout}>
             Logout
           </button>
 
@@ -217,10 +296,16 @@ function App() {
     );
   }
 
+  // =========================
+  // LOGIN / REGISTER PAGE
+  // =========================
+
   return (
     <div className="login-container">
 
       <div className="login-box">
+
+        {/* PAGE TITLE */}
 
         <h1>
           {showOtp
@@ -230,6 +315,8 @@ function App() {
             : "Welcome Back"}
         </h1>
 
+        {/* PAGE DESCRIPTION */}
+
         <p>
           {showOtp
             ? "Enter the OTP to complete registration"
@@ -238,9 +325,12 @@ function App() {
             : "Login to your account"}
         </p>
 
+        {/* =========================
+            OTP SCREEN
+        ========================= */}
+
         {showOtp ? (
           <>
-
             <label>OTP</label>
 
             <input
@@ -251,7 +341,10 @@ function App() {
               value={otp}
               onChange={(e) => {
                 const value =
-                  e.target.value.replace(/\D/g, "");
+                  e.target.value.replace(
+                    /\D/g,
+                    ""
+                  );
 
                 setOtp(value);
                 setOtpMessage("");
@@ -282,10 +375,12 @@ function App() {
             >
               Back to Login
             </button>
-
           </>
         ) : (
           <>
+            {/* =========================
+                NAME
+            ========================= */}
 
             {isRegistering && (
               <>
@@ -301,19 +396,26 @@ function App() {
                   }}
                 />
 
-                {name && !validateName(name) && (
-                  <p className="validation-error">
-                    Name should contain only letters and spaces
-                  </p>
-                )}
+                {name &&
+                  !validateName(name) && (
+                    <p className="validation-error">
+                      Name should contain only
+                      letters and spaces
+                    </p>
+                  )}
 
-                {name && validateName(name) && (
-                  <p className="validation-success">
-                    Name is valid
-                  </p>
-                )}
+                {name &&
+                  validateName(name) && (
+                    <p className="validation-success">
+                      Name is valid
+                    </p>
+                  )}
               </>
             )}
+
+            {/* =========================
+                EMAIL
+            ========================= */}
 
             <label>Email</label>
 
@@ -328,17 +430,23 @@ function App() {
               }}
             />
 
-            {email && !validateEmail(email) && (
-              <p className="validation-error">
-                Please enter a valid email address
-              </p>
-            )}
+            {email &&
+              !validateEmail(email) && (
+                <p className="validation-error">
+                  Please enter a valid email address
+                </p>
+              )}
 
-            {email && validateEmail(email) && (
-              <p className="validation-success">
-                Email is valid
-              </p>
-            )}
+            {email &&
+              validateEmail(email) && (
+                <p className="validation-success">
+                  Email is valid
+                </p>
+              )}
+
+            {/* =========================
+                PASSWORD
+            ========================= */}
 
             <label>Password</label>
 
@@ -363,7 +471,9 @@ function App() {
                 type="button"
                 className="show-password"
                 onClick={() =>
-                  setShowPassword(!showPassword)
+                  setShowPassword(
+                    !showPassword
+                  )
                 }
               >
                 {showPassword
@@ -373,82 +483,95 @@ function App() {
 
             </div>
 
-            {password && isRegistering && (
-              <div className="password-requirements">
+            {/* =========================
+                PASSWORD REQUIREMENTS
+            ========================= */}
 
-                <p
-                  className={
-                    passwordChecks.length
-                      ? "validation-success"
-                      : "validation-error"
-                  }
-                >
-                  {passwordChecks.length
-                    ? "Valid"
-                    : "Invalid"}{" "}
-                  At least 8 characters
-                </p>
+            {password &&
+              isRegistering && (
+                <div className="password-requirements">
 
-                <p
-                  className={
-                    passwordChecks.uppercase
-                      ? "validation-success"
-                      : "validation-error"
-                  }
-                >
-                  {passwordChecks.uppercase
-                    ? "Valid"
-                    : "Invalid"}{" "}
-                  One uppercase letter
-                </p>
+                  <p
+                    className={
+                      passwordChecks.length
+                        ? "validation-success"
+                        : "validation-error"
+                    }
+                  >
+                    {passwordChecks.length
+                      ? "Valid"
+                      : "Invalid"}{" "}
+                    At least 8 characters
+                  </p>
 
-                <p
-                  className={
-                    passwordChecks.lowercase
-                      ? "validation-success"
-                      : "validation-error"
-                  }
-                >
-                  {passwordChecks.lowercase
-                    ? "Valid"
-                    : "Invalid"}{" "}
-                  One lowercase letter
-                </p>
+                  <p
+                    className={
+                      passwordChecks.uppercase
+                        ? "validation-success"
+                        : "validation-error"
+                    }
+                  >
+                    {passwordChecks.uppercase
+                      ? "Valid"
+                      : "Invalid"}{" "}
+                    One uppercase letter
+                  </p>
 
-                <p
-                  className={
-                    passwordChecks.number
-                      ? "validation-success"
-                      : "validation-error"
-                  }
-                >
-                  {passwordChecks.number
-                    ? "Valid"
-                    : "Invalid"}{" "}
-                  One number
-                </p>
+                  <p
+                    className={
+                      passwordChecks.lowercase
+                        ? "validation-success"
+                        : "validation-error"
+                    }
+                  >
+                    {passwordChecks.lowercase
+                      ? "Valid"
+                      : "Invalid"}{" "}
+                    One lowercase letter
+                  </p>
 
-                <p
-                  className={
-                    passwordChecks.special
-                      ? "validation-success"
-                      : "validation-error"
-                  }
-                >
-                  {passwordChecks.special
-                    ? "Valid"
-                    : "Invalid"}{" "}
-                  One special character
-                </p>
+                  <p
+                    className={
+                      passwordChecks.number
+                        ? "validation-success"
+                        : "validation-error"
+                    }
+                  >
+                    {passwordChecks.number
+                      ? "Valid"
+                      : "Invalid"}{" "}
+                    One number
+                  </p>
 
-              </div>
-            )}
+                  <p
+                    className={
+                      passwordChecks.special
+                        ? "validation-success"
+                        : "validation-error"
+                    }
+                  >
+                    {passwordChecks.special
+                      ? "Valid"
+                      : "Invalid"}{" "}
+                    One special character
+                  </p>
+
+                </div>
+              )}
+
+            {/* =========================
+                LOGIN ERROR
+            ========================= */}
 
             {error && (
               <p className="error">
                 {error}
               </p>
             )}
+
+            {/* =========================
+                REGISTER / LOGIN BUTTON
+            ========================= */}
 
             {isRegistering ? (
               <>
@@ -458,6 +581,7 @@ function App() {
 
                 <p>
                   Already have an account?{" "}
+
                   <button
                     type="button"
                     onClick={() => {
@@ -481,6 +605,7 @@ function App() {
 
                 <p>
                   Don't have an account?{" "}
+
                   <button
                     type="button"
                     onClick={() => {
@@ -498,6 +623,10 @@ function App() {
               </>
             )}
 
+            {/* =========================
+                REGISTRATION MESSAGE
+            ========================= */}
+
             {registerMessage && (
               <p>
                 {registerMessage}
@@ -508,7 +637,6 @@ function App() {
         )}
 
       </div>
-
     </div>
   );
 }

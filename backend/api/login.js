@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const { Pool } = require("pg");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken"); // NEW
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -55,10 +56,51 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Login successful
+    // =================================
+    // CREATE JWT
+    // =================================
+
+    const token = jwt.sign(
+      {
+        userId: user.id,
+        email: user.email
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "1h"
+      }
+    );
+
+    // =================================
+    // CREATE SESSION
+    // =================================
+
+    const expiresAt = new Date(
+      Date.now() + 60 * 60 * 1000
+    );
+
+    await pool.query(
+      `INSERT INTO sessions
+       (user_id, token, expires_at)
+       VALUES ($1, $2, $3)`,
+      [
+        user.id,
+        token,
+        expiresAt
+      ]
+    );
+
+    // =================================
+    // LOGIN SUCCESSFUL
+    // =================================
+
     return res.status(200).json({
       success: true,
       message: "Login successful",
+
+      // Send JWT to frontend
+      token: token,
+
       user: {
         id: user.id,
         name: user.name,
