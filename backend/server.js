@@ -97,7 +97,8 @@ app.post("/api/register", async (req, res) => {
 
     return res.status(200).json({
       requiresOTP: true,
-      message: "OTP generated. Please enter the OTP."
+      message: "OTP generated. Please enter the OTP.",
+      otp:otp
     });
 
   } catch (error) {
