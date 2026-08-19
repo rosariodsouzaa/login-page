@@ -5,15 +5,39 @@ const { Pool } = require("pg");
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false,
+  },
 });
 
 module.exports = async (req, res) => {
 
+  // ==================== CORS ====================
+
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://front-end-eight-sooty.vercel.app"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "POST, OPTIONS"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+
+  // Handle browser preflight request
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // ==================== ONLY POST ====================
+
   if (req.method !== "POST") {
     return res.status(405).json({
-      message: "Method not allowed"
+      message: "Method not allowed",
     });
   }
 
@@ -22,13 +46,13 @@ module.exports = async (req, res) => {
   if (!email || !otp) {
     return res.status(400).json({
       success: false,
-      message: "Email and OTP are required"
+      message: "Email and OTP are required",
     });
   }
 
   try {
 
-    // Get the OTP and temporary registration data
+    // Get OTP and temporary registration data
     const result = await pool.query(
       `SELECT *
        FROM otps
@@ -38,17 +62,17 @@ module.exports = async (req, res) => {
       [email]
     );
 
-    // OTP does not exist
+    // OTP not found
     if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: "OTP not found or expired"
+        message: "OTP not found or expired",
       });
     }
 
     const storedOtp = result.rows[0];
 
-    // Check if OTP has expired
+    // Check expiration
     if (
       new Date() >
       new Date(storedOtp.expires_at)
@@ -61,11 +85,11 @@ module.exports = async (req, res) => {
 
       return res.status(401).json({
         success: false,
-        message: "OTP has expired"
+        message: "OTP has expired",
       });
     }
 
-    // Check whether OTP is correct
+    // Check OTP
     if (
       String(otp) !==
       String(storedOtp.otp)
@@ -73,11 +97,11 @@ module.exports = async (req, res) => {
 
       return res.status(401).json({
         success: false,
-        message: "Invalid OTP"
+        message: "Invalid OTP",
       });
     }
 
-    // OTP is correct, so create the user
+    // OTP correct → create user
     const newUser = await pool.query(
       `INSERT INTO users
        (name, email, password)
@@ -86,11 +110,11 @@ module.exports = async (req, res) => {
       [
         storedOtp.name,
         storedOtp.email,
-        storedOtp.password
+        storedOtp.password,
       ]
     );
 
-    // Delete the used OTP
+    // Delete used OTP
     await pool.query(
       "DELETE FROM otps WHERE email = $1",
       [email]
@@ -99,7 +123,7 @@ module.exports = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Registration successful",
-      user: newUser.rows[0]
+      user: newUser.rows[0],
     });
 
   } catch (error) {
@@ -111,7 +135,7 @@ module.exports = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Server error"
+      message: "Server error",
     });
   }
 };

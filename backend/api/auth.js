@@ -6,40 +6,39 @@ const jwt = require("jsonwebtoken");
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false,
+  },
 });
 
-const authenticateToken = async (req, res) => {
+const authenticateToken = async (req, res, next) => {
   try {
 
     const authHeader = req.headers.authorization;
 
+    // No token
     if (!authHeader) {
-      res.status(401).json({
+      return res.status(401).json({
         success: false,
-        message: "Authorization token is required"
+        message: "Authorization token is required",
       });
-
-      return false;
     }
 
+    // Check Bearer format
     const parts = authHeader.split(" ");
 
     if (
       parts.length !== 2 ||
       parts[0] !== "Bearer"
     ) {
-      res.status(401).json({
+      return res.status(401).json({
         success: false,
-        message: "Invalid authorization format"
+        message: "Invalid authorization format",
       });
-
-      return false;
     }
 
     const token = parts[1];
 
+    // Verify JWT
     let decoded;
 
     try {
@@ -48,14 +47,13 @@ const authenticateToken = async (req, res) => {
         process.env.JWT_SECRET
       );
     } catch (error) {
-      res.status(401).json({
+      return res.status(401).json({
         success: false,
-        message: "Invalid or expired token"
+        message: "Invalid or expired token",
       });
-
-      return false;
     }
 
+    // Check session in database
     const result = await pool.query(
       `SELECT *
        FROM sessions
@@ -67,28 +65,29 @@ const authenticateToken = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      res.status(401).json({
+      return res.status(401).json({
         success: false,
-        message: "Session expired or logged out"
+        message: "Session expired or logged out",
       });
-
-      return false;
     }
 
+    // Save user information
     req.user = decoded;
 
-    return true;
+    // Continue to the actual API
+    next();
 
   } catch (error) {
 
-    console.error("Authentication error:", error);
+    console.error(
+      "Authentication error:",
+      error
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: "Authentication server error"
+      message: "Authentication server error",
     });
-
-    return false;
   }
 };
 

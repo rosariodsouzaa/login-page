@@ -6,17 +6,40 @@ const jwt = require("jsonwebtoken");
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false
-  }
+    rejectUnauthorized: false,
+  },
 });
 
 module.exports = async (req, res) => {
 
-  // Only allow POST requests
+  // ==================== CORS ====================
+
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://front-end-eight-sooty.vercel.app"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "POST, OPTIONS"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+
+  // Handle browser preflight request
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // ==================== ONLY POST ====================
+
   if (req.method !== "POST") {
     return res.status(405).json({
       success: false,
-      message: "Method not allowed"
+      message: "Method not allowed",
     });
   }
 
@@ -31,7 +54,7 @@ module.exports = async (req, res) => {
     if (!authHeader) {
       return res.status(401).json({
         success: false,
-        message: "Authorization token is required"
+        message: "Authorization token is required",
       });
     }
 
@@ -46,7 +69,7 @@ module.exports = async (req, res) => {
     ) {
       return res.status(401).json({
         success: false,
-        message: "Invalid authorization format"
+        message: "Invalid authorization format",
       });
     }
 
@@ -67,7 +90,7 @@ module.exports = async (req, res) => {
 
       return res.status(401).json({
         success: false,
-        message: "Invalid or expired token"
+        message: "Invalid or expired token",
       });
 
     }
@@ -89,7 +112,7 @@ module.exports = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
-        message: "Session already logged out or not found"
+        message: "Session already logged out or not found",
       });
     }
 
@@ -99,7 +122,7 @@ module.exports = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Logout successful"
+      message: "Logout successful",
     });
 
   } catch (error) {
@@ -111,7 +134,7 @@ module.exports = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Server error"
+      message: "Server error",
     });
   }
 };
