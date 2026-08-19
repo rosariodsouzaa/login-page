@@ -25,6 +25,7 @@ function App() {
 
   // Stores the currently logged-in user
   const [loggedInUser, setLoggedInUser] = useState(null);
+  
 
   // =========================
   // VALIDATION
@@ -167,6 +168,7 @@ function App() {
       );
     }
   };
+  
 
   // =========================
   // REGISTRATION OTP
