@@ -9,6 +9,31 @@ const pool = new Pool({
 });
 
 module.exports = async (req, res) => {
+
+  // ==================== CORS ====================
+
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://front-end-eight-sooty.vercel.app"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "POST, OPTIONS"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+
+  // Handle browser preflight request
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // ==================== ONLY POST ====================
+
   if (req.method !== "POST") {
     return res.status(405).json({
       message: "Method not allowed",
@@ -24,7 +49,8 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Check if the user already exists
+
+    // Check if user already exists
     const existingUser = await pool.query(
       "SELECT id FROM users WHERE email = $1",
       [email]
@@ -41,6 +67,7 @@ module.exports = async (req, res) => {
       100000 + Math.random() * 900000
     ).toString();
 
+    // OTP expires in 5 minutes
     const expiresAt = new Date(
       Date.now() + 5 * 60 * 1000
     );
@@ -51,7 +78,7 @@ module.exports = async (req, res) => {
       10
     );
 
-    // Delete any old OTP
+    // Delete old OTP
     await pool.query(
       "DELETE FROM otps WHERE email = $1",
       [email]
@@ -78,10 +105,13 @@ module.exports = async (req, res) => {
     return res.status(200).json({
       message: "OTP generated. Please enter the OTP.",
       requiresOTP: true,
-      otp:otp
+
+      // TEMPORARY: only for testing
+      otp: otp,
     });
 
   } catch (error) {
+
     console.error("Registration error:", error);
 
     return res.status(500).json({
