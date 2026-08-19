@@ -13,7 +13,6 @@ const pool = new Pool({
 const authenticateToken = async (req, res) => {
   try {
 
-    // Get Authorization header
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
@@ -24,9 +23,6 @@ const authenticateToken = async (req, res) => {
 
       return false;
     }
-
-    // Expected:
-    // Bearer TOKEN
 
     const parts = authHeader.split(" ");
 
@@ -44,18 +40,14 @@ const authenticateToken = async (req, res) => {
 
     const token = parts[1];
 
-    // Verify JWT
     let decoded;
 
     try {
-
       decoded = jwt.verify(
         token,
         process.env.JWT_SECRET
       );
-
     } catch (error) {
-
       res.status(401).json({
         success: false,
         message: "Invalid or expired token"
@@ -64,7 +56,6 @@ const authenticateToken = async (req, res) => {
       return false;
     }
 
-    // Check session in database
     const result = await pool.query(
       `SELECT *
        FROM sessions
@@ -75,9 +66,7 @@ const authenticateToken = async (req, res) => {
       [token]
     );
 
-    // Session doesn't exist or was revoked
     if (result.rows.length === 0) {
-
       res.status(401).json({
         success: false,
         message: "Session expired or logged out"
@@ -86,17 +75,13 @@ const authenticateToken = async (req, res) => {
       return false;
     }
 
-    // Attach user information
     req.user = decoded;
 
     return true;
 
   } catch (error) {
 
-    console.error(
-      "Authentication error:",
-      error
-    );
+    console.error("Authentication error:", error);
 
     res.status(500).json({
       success: false,

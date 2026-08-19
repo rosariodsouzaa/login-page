@@ -1,4 +1,42 @@
-app.post("/api/login", async (req, res) => {
+require("dotenv").config();
+
+const { Pool } = require("pg");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
+module.exports = async (req, res) => {
+
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://front-end-eight-sooty.vercel.app"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, OPTIONS"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  if (req.method !== "POST") {
+    return res.status(405).json({
+      message: "Method not allowed"
+    });
+  }
 
   const { email, password } = req.body;
 
@@ -10,7 +48,6 @@ app.post("/api/login", async (req, res) => {
 
   try {
 
-    // Find registered user
     const result = await pool.query(
       "SELECT * FROM users WHERE email = $1",
       [email]
@@ -24,7 +61,6 @@ app.post("/api/login", async (req, res) => {
 
     const user = result.rows[0];
 
-    // Compare entered password with hashed password
     const passwordMatch = await bcrypt.compare(
       password,
       user.password
@@ -35,9 +71,6 @@ app.post("/api/login", async (req, res) => {
         message: "Invalid email or password"
       });
     }
-
-
-    // ==================== CREATE JWT TOKEN ====================
 
     const token = jwt.sign(
       {
@@ -50,10 +83,7 @@ app.post("/api/login", async (req, res) => {
       }
     );
 
-
-    // ==================== LOGIN SUCCESS ====================
-
-    return res.json({
+    return res.status(200).json({
       success: true,
       message: "Login successful",
       token: token,
@@ -66,13 +96,10 @@ app.post("/api/login", async (req, res) => {
 
   } catch (error) {
 
-    console.error(
-      "Login error:",
-      error
-    );
+    console.error("Login error:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       message: "Server error"
     });
   }
-});
+};
