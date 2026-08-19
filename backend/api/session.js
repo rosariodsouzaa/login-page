@@ -62,8 +62,7 @@ module.exports = async (req, res) => {
       user: result.rows[0]
     });
 
-  } catch (error) {
-
+  } catch {
     return res.status(401).json({
       success: false,
       message: "Session expired or invalid"
