@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState,useEffect } from "react";
 import axios from "axios";
 import "./App.css";
 
@@ -24,8 +24,34 @@ function App() {
   const [otpMessage, setOtpMessage] = useState("");
 
   // Stores the currently logged-in user
-  const [loggedInUser, setLoggedInUser] = useState(null);
   
+  const [loggedInUser, setLoggedInUser] = useState(null);
+useEffect(() => {
+  const token = localStorage.getItem("token");
+
+  if (!token) return;
+
+  const verifySession = async () => {
+    try {
+      const response = await axios.get(
+        `${API_URL}/api/session`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.data.success) {
+        setLoggedInUser(response.data.user);
+      }
+    } catch {
+      localStorage.removeItem("token");
+    }
+  };
+
+  verifySession();
+}, []);
 
   // =========================
   // VALIDATION
@@ -297,6 +323,7 @@ function App() {
       </div>
     );
   }
+  
 
   // =========================
   // LOGIN / REGISTER PAGE
