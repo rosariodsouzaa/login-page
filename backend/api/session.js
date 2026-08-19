@@ -4,11 +4,37 @@ const jwt = require("jsonwebtoken");
 
 module.exports = async (req, res) => {
 
+  // ==================== CORS ====================
+
+  res.setHeader(
+    "Access-Control-Allow-Origin",
+    "https://front-end-eight-sooty.vercel.app"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, OPTIONS"
+  );
+
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+
+  // Handle browser preflight request
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // ==================== ONLY GET ====================
+
   if (req.method !== "GET") {
     return res.status(405).json({
       message: "Method not allowed"
     });
   }
+
+  // ==================== GET TOKEN ====================
 
   const authHeader = req.headers.authorization;
 
@@ -19,6 +45,9 @@ module.exports = async (req, res) => {
     });
   }
 
+  // Expected:
+  // Authorization: Bearer YOUR_TOKEN
+
   const token = authHeader.split(" ")[1];
 
   if (!token) {
@@ -27,6 +56,8 @@ module.exports = async (req, res) => {
       message: "Invalid token"
     });
   }
+
+  // ==================== VERIFY TOKEN ====================
 
   try {
 
@@ -46,5 +77,6 @@ module.exports = async (req, res) => {
       success: false,
       message: "Invalid or expired session"
     });
+
   }
 };
