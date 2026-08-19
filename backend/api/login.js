@@ -1,23 +1,4 @@
-require("dotenv").config();
-
-const { Pool } = require("pg");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken"); // NEW
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
-});
-
-module.exports = async (req, res) => {
-
-  if (req.method !== "POST") {
-    return res.status(405).json({
-      message: "Method not allowed"
-    });
-  }
+app.post("/api/login", async (req, res) => {
 
   const { email, password } = req.body;
 
@@ -29,13 +10,12 @@ module.exports = async (req, res) => {
 
   try {
 
-    // Find user using email
+    // Find registered user
     const result = await pool.query(
       "SELECT * FROM users WHERE email = $1",
       [email]
     );
 
-    // User does not exist
     if (result.rows.length === 0) {
       return res.status(401).json({
         message: "Invalid email or password"
@@ -56,13 +36,12 @@ module.exports = async (req, res) => {
       });
     }
 
-    // =================================
-    // CREATE JWT
-    // =================================
+
+    // ==================== CREATE JWT TOKEN ====================
 
     const token = jwt.sign(
       {
-        userId: user.id,
+        id: user.id,
         email: user.email
       },
       process.env.JWT_SECRET,
@@ -71,36 +50,13 @@ module.exports = async (req, res) => {
       }
     );
 
-    // =================================
-    // CREATE SESSION
-    // =================================
 
-    const expiresAt = new Date(
-      Date.now() + 60 * 60 * 1000
-    );
+    // ==================== LOGIN SUCCESS ====================
 
-    await pool.query(
-      `INSERT INTO sessions
-       (user_id, token, expires_at)
-       VALUES ($1, $2, $3)`,
-      [
-        user.id,
-        token,
-        expiresAt
-      ]
-    );
-
-    // =================================
-    // LOGIN SUCCESSFUL
-    // =================================
-
-    return res.status(200).json({
+    return res.json({
       success: true,
       message: "Login successful",
-
-      // Send JWT to frontend
       token: token,
-
       user: {
         id: user.id,
         name: user.name,
@@ -110,10 +66,13 @@ module.exports = async (req, res) => {
 
   } catch (error) {
 
-    console.error("Login error:", error);
+    console.error(
+      "Login error:",
+      error
+    );
 
-    return res.status(500).json({
+    res.status(500).json({
       message: "Server error"
     });
   }
-};
+});

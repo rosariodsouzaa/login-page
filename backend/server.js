@@ -4,7 +4,7 @@ const express = require("express");
 const { Pool } = require("pg");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
-
+const jwt = require("jsonwebtoken");
 const app = express();
 
 app.use(cors());
@@ -156,15 +156,33 @@ app.post("/api/login", async (req, res) => {
     }
 
     // Login successful directly
-    return res.json({
-      success: true,
-      message: "Login successful",
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email
-      }
-    });
+   // ==================== CREATE JWT TOKEN ====================
+
+const token = jwt.sign(
+  {
+    id: user.id,
+    email: user.email
+  },
+  process.env.JWT_SECRET,
+  {
+    expiresIn: "1h"
+  }
+);
+
+
+// ==================== LOGIN SUCCESS ====================
+
+return res.json({
+  success: true,
+  message: "Login successful",
+  token: token,
+  user: {
+    id: user.id,
+    name: user.name,
+    email: user.email
+  }
+});
+
 
   } catch (error) {
 
