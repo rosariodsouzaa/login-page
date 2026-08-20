@@ -33,6 +33,7 @@ function App() {
   const [walletAddress, setWalletAddress] = useState("");
   const [walletBalance, setWalletBalance] = useState(null);
   const [networkName, setNetworkName] = useState("");
+  const [currencySymbol, setCurrencySymbol] = useState("BNB");
   const [isMetaMaskInstalled, setIsMetaMaskInstalled] = useState(false);
   const [isConnectingWallet, setIsConnectingWallet] = useState(false);
   const [web3Error, setWeb3Error] = useState("");
@@ -67,34 +68,36 @@ function App() {
     verifySession();
   }, []);
 
-  // Map Chain IDs to Human Readable Names
-  const getNetworkNameByChainId = (chainId) => {
+  // Map Chain IDs to Human Readable Names & Native Token Symbol
+  const getNetworkDetailsByChainId = (chainId) => {
     switch (chainId) {
-      case "0x1":
-        return "Ethereum Mainnet";
-      case "0xaa36a7":
-        return "Sepolia Testnet";
-      case "0x5":
-        return "Goerli Testnet";
-      case "0x89":
-        return "Polygon Mainnet";
-      case "0x13881":
-        return "Polygon Mumbai";
-      case "0xa4b1":
-        return "Arbitrum One";
-      case "0xa":
-        return "Optimism";
       case "0x38":
-        return "BNB Smart Chain";
+        return { name: "BNB Smart Chain Mainnet", symbol: "BNB" };
+      case "0x61":
+        return { name: "BNB Smart Chain Testnet", symbol: "BNB" };
+      case "0x1":
+        return { name: "Ethereum Mainnet", symbol: "ETH" };
+      case "0xaa36a7":
+        return { name: "Sepolia Testnet", symbol: "ETH" };
+      case "0x5":
+        return { name: "Goerli Testnet", symbol: "ETH" };
+      case "0x89":
+        return { name: "Polygon Mainnet", symbol: "MATIC" };
+      case "0x13881":
+        return { name: "Polygon Mumbai", symbol: "MATIC" };
+      case "0xa4b1":
+        return { name: "Arbitrum One", symbol: "ETH" };
+      case "0xa":
+        return { name: "Optimism", symbol: "ETH" };
       case "0x539":
       case "0x7a69":
-        return "Localhost 8545";
+        return { name: "Localhost 8545", symbol: "BNB" };
       default:
-        return `Chain ID: ${chainId}`;
+        return { name: `Chain ID: ${chainId}`, symbol: "BNB" };
     }
   };
 
-  // Fetch ETH balance and Network details
+  // Fetch Balance and Network details
   const fetchWalletDetails = async (account) => {
     if (!window.ethereum) return;
     try {
@@ -104,13 +107,15 @@ function App() {
       });
 
       const balanceInWei = BigInt(balanceHex);
-      const balanceInEth = (Number(balanceInWei) / 1e18).toFixed(4);
-      setWalletBalance(balanceInEth);
+      const balanceInFormatted = (Number(balanceInWei) / 1e18).toFixed(4);
+      setWalletBalance(balanceInFormatted);
 
       const chainIdHex = await window.ethereum.request({
         method: "eth_chainId",
       });
-      setNetworkName(getNetworkNameByChainId(chainIdHex));
+      const networkDetails = getNetworkDetailsByChainId(chainIdHex);
+      setNetworkName(networkDetails.name);
+      setCurrencySymbol(networkDetails.symbol);
     } catch (err) {
       console.error("Error fetching wallet details:", err);
     }
@@ -153,6 +158,7 @@ function App() {
     setWalletAddress("");
     setWalletBalance(null);
     setNetworkName("");
+    setCurrencySymbol("BNB");
     setSignature("");
     setWeb3Error("");
   };
@@ -546,28 +552,30 @@ function App() {
                   </div>
 
                   <div className="wallet-field">
-                    <span className="field-label">Wallet Address</span>
-                    <div className="address-container">
-                      <span className="address-text" title={walletAddress}>
-                        {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                    <span className="field-label">Account Balance</span>
+                    <div className="balance-display">
+                      <span className="balance-amount">
+                        {walletBalance !== null ? walletBalance : "0.0000"}
                       </span>
+                      <span className={`balance-unit token-${currencySymbol.toLowerCase()}`}>
+                        {currencySymbol}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="wallet-field full-address-field">
+                    <div className="field-header">
+                      <span className="field-label">MetaMask User Address</span>
                       <button
                         type="button"
                         className="btn-copy-address"
                         onClick={handleCopyAddress}
                       >
-                        {copiedAddress ? "Copied!" : "Copy"}
+                        {copiedAddress ? "Copied Address!" : "Copy Address"}
                       </button>
                     </div>
-                  </div>
-
-                  <div className="wallet-field">
-                    <span className="field-label">Account Balance</span>
-                    <div className="balance-display">
-                      <span className="balance-amount">
-                        {walletBalance !== null ? walletBalance : "Loading..."}
-                      </span>
-                      <span className="balance-unit">ETH</span>
+                    <div className="full-address-box">
+                      <code className="full-address-code">{walletAddress}</code>
                     </div>
                   </div>
                 </div>
