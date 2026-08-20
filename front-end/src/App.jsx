@@ -24,34 +24,217 @@ function App() {
   const [otpMessage, setOtpMessage] = useState("");
 
   // Stores the currently logged-in user
-  
   const [loggedInUser, setLoggedInUser] = useState(null);
-useEffect(() => {
-  const token = localStorage.getItem("token");
 
-  if (!token) return;
+  // =========================
+  // METAMASK WEB3 STATE
+  // =========================
 
-  const verifySession = async () => {
-    try {
-      const response = await axios.get(
-        `${API_URL}/api/session`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`
+  const [walletAddress, setWalletAddress] = useState("");
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [networkName, setNetworkName] = useState("");
+  const [isMetaMaskInstalled, setIsMetaMaskInstalled] = useState(false);
+  const [isConnectingWallet, setIsConnectingWallet] = useState(false);
+  const [web3Error, setWeb3Error] = useState("");
+  const [copiedAddress, setCopiedAddress] = useState(false);
+  const [signature, setSignature] = useState("");
+  const [isSigning, setIsSigning] = useState(false);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (!token) return;
+
+    const verifySession = async () => {
+      try {
+        const response = await axios.get(
+          `${API_URL}/api/session`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
           }
-        }
-      );
+        );
 
-      if (response.data.success) {
-        setLoggedInUser(response.data.user);
+        if (response.data.success) {
+          setLoggedInUser(response.data.user);
+        }
+      } catch {
+        localStorage.removeItem("token");
       }
-    } catch {
-      localStorage.removeItem("token");
+    };
+
+    verifySession();
+  }, []);
+
+  // Map Chain IDs to Human Readable Names
+  const getNetworkNameByChainId = (chainId) => {
+    switch (chainId) {
+      case "0x1":
+        return "Ethereum Mainnet";
+      case "0xaa36a7":
+        return "Sepolia Testnet";
+      case "0x5":
+        return "Goerli Testnet";
+      case "0x89":
+        return "Polygon Mainnet";
+      case "0x13881":
+        return "Polygon Mumbai";
+      case "0xa4b1":
+        return "Arbitrum One";
+      case "0xa":
+        return "Optimism";
+      case "0x38":
+        return "BNB Smart Chain";
+      case "0x539":
+      case "0x7a69":
+        return "Localhost 8545";
+      default:
+        return `Chain ID: ${chainId}`;
     }
   };
 
-  verifySession();
-}, []);
+  // Fetch ETH balance and Network details
+  const fetchWalletDetails = async (account) => {
+    if (!window.ethereum) return;
+    try {
+      const balanceHex = await window.ethereum.request({
+        method: "eth_getBalance",
+        params: [account, "latest"],
+      });
+
+      const balanceInWei = BigInt(balanceHex);
+      const balanceInEth = (Number(balanceInWei) / 1e18).toFixed(4);
+      setWalletBalance(balanceInEth);
+
+      const chainIdHex = await window.ethereum.request({
+        method: "eth_chainId",
+      });
+      setNetworkName(getNetworkNameByChainId(chainIdHex));
+    } catch (err) {
+      console.error("Error fetching wallet details:", err);
+    }
+  };
+
+  // Connect MetaMask Wallet
+  const connectMetaMask = async () => {
+    setWeb3Error("");
+    setIsConnectingWallet(true);
+
+    if (!window.ethereum) {
+      setWeb3Error("MetaMask extension is not installed in your browser.");
+      setIsConnectingWallet(false);
+      return;
+    }
+
+    try {
+      const accounts = await window.ethereum.request({
+        method: "eth_requestAccounts",
+      });
+
+      if (accounts && accounts.length > 0) {
+        const primaryAccount = accounts[0];
+        setWalletAddress(primaryAccount);
+        await fetchWalletDetails(primaryAccount);
+      }
+    } catch (err) {
+      if (err.code === 4001) {
+        setWeb3Error("Connection request was cancelled in MetaMask.");
+      } else {
+        setWeb3Error(err.message || "Failed to connect MetaMask wallet.");
+      }
+    } finally {
+      setIsConnectingWallet(false);
+    }
+  };
+
+  // Disconnect Wallet
+  const disconnectWallet = () => {
+    setWalletAddress("");
+    setWalletBalance(null);
+    setNetworkName("");
+    setSignature("");
+    setWeb3Error("");
+  };
+
+  // Sign Session Message with MetaMask
+  const handleSignMessage = async () => {
+    if (!walletAddress || !window.ethereum) return;
+    setIsSigning(true);
+    setWeb3Error("");
+    try {
+      const timestamp = new Date().toISOString();
+      const message = `MetaMask Session Verification\n\nUser: ${loggedInUser?.name} (${loggedInUser?.email})\nWallet: ${walletAddress}\nTime: ${timestamp}`;
+      const sig = await window.ethereum.request({
+        method: "personal_sign",
+        params: [message, walletAddress],
+      });
+      setSignature(sig);
+    } catch (err) {
+      if (err.code === 4001) {
+        setWeb3Error("Signature request was cancelled by user.");
+      } else {
+        setWeb3Error("Failed to sign message.");
+      }
+    } finally {
+      setIsSigning(false);
+    }
+  };
+
+  // Copy wallet address to clipboard
+  const handleCopyAddress = () => {
+    if (!walletAddress) return;
+    navigator.clipboard.writeText(walletAddress);
+    setCopiedAddress(true);
+    setTimeout(() => setCopiedAddress(false), 2000);
+  };
+
+  // MetaMask Auto-detect & Event Listeners
+  useEffect(() => {
+    if (!loggedInUser) return;
+
+    if (typeof window !== "undefined" && window.ethereum) {
+      setIsMetaMaskInstalled(true);
+
+      // Check if wallet is already connected
+      window.ethereum
+        .request({ method: "eth_accounts" })
+        .then((accounts) => {
+          if (accounts && accounts.length > 0) {
+            setWalletAddress(accounts[0]);
+            fetchWalletDetails(accounts[0]);
+          }
+        })
+        .catch(console.error);
+
+      const handleAccountsChanged = (accounts) => {
+        if (accounts.length === 0) {
+          disconnectWallet();
+        } else {
+          setWalletAddress(accounts[0]);
+          fetchWalletDetails(accounts[0]);
+        }
+      };
+
+      const handleChainChanged = () => {
+        if (walletAddress) {
+          fetchWalletDetails(walletAddress);
+        }
+      };
+
+      window.ethereum.on("accountsChanged", handleAccountsChanged);
+      window.ethereum.on("chainChanged", handleChainChanged);
+
+      return () => {
+        if (window.ethereum && window.ethereum.removeListener) {
+          window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
+          window.ethereum.removeListener("chainChanged", handleChainChanged);
+        }
+      };
+    } else {
+      setIsMetaMaskInstalled(false);
+    }
+  }, [loggedInUser]);
 
   // =========================
   // VALIDATION
@@ -277,6 +460,9 @@ useEffect(() => {
       // Remove JWT from browser
       localStorage.removeItem("token");
 
+      // Disconnect MetaMask session
+      disconnectWallet();
+
       // Clear logged-in user
       setLoggedInUser(null);
 
@@ -298,27 +484,138 @@ useEffect(() => {
   if (loggedInUser) {
     return (
       <div className="login-container">
-        <div className="login-box">
+        <div className="login-box dashboard-box">
+          <div className="user-profile-header">
+            <div className="avatar-circle">
+              {loggedInUser.name ? loggedInUser.name.charAt(0).toUpperCase() : "U"}
+            </div>
+            <div>
+              <h1>Welcome, {loggedInUser.name}!</h1>
+              <p className="user-email">{loggedInUser.email}</p>
+            </div>
+          </div>
 
-          <h1>Dashboard</h1>
+          <div className="metamask-section">
+            <div className="metamask-header">
+              <div className="metamask-title">
+                <svg className="metamask-icon" viewBox="0 0 318.6 318.6" width="28" height="28">
+                  <path fill="#E2761B" stroke="#E2761B" strokeMiterlimit="10" d="M274.1 35.5l-99.5 73.9L193.5 18l-114.7 0 18.9 91.4-99.5-73.9L0 159.9l104.9 51.5-39.6 61.1 114.7-31.5 114.7 31.5-39.6-61.1L318.6 159.9z"/>
+                  <path fill="#E4761B" stroke="#E4761B" strokeMiterlimit="10" d="M117.8 241l-24.7 44.4 99.5 0-24.7-44.4z"/>
+                </svg>
+                <h2>MetaMask Web3 Account</h2>
+              </div>
+              {walletAddress && (
+                <span className="status-badge connected">
+                  <span className="dot"></span> Connected
+                </span>
+              )}
+            </div>
 
-          <p>
-            Welcome, {loggedInUser.name}
-          </p>
+            {web3Error && <div className="error web3-error-banner">{web3Error}</div>}
 
-          <p>
-            You have successfully logged in.
-          </p>
+            {!isMetaMaskInstalled ? (
+              <div className="metamask-notice">
+                <p>MetaMask extension is not detected in your browser.</p>
+                <a
+                  href="https://metamask.io/download/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-metamask-install"
+                >
+                  Install MetaMask Extension ↗
+                </a>
+              </div>
+            ) : !walletAddress ? (
+              <div className="metamask-connect-prompt">
+                <p>Connect your MetaMask wallet to access your Ethereum account session.</p>
+                <button
+                  type="button"
+                  className="btn-metamask-connect"
+                  onClick={connectMetaMask}
+                  disabled={isConnectingWallet}
+                >
+                  {isConnectingWallet ? "Connecting to MetaMask..." : "Connect MetaMask Wallet"}
+                </button>
+              </div>
+            ) : (
+              <div className="metamask-dashboard-content">
+                <div className="wallet-card">
+                  <div className="wallet-field">
+                    <span className="field-label">Connected Network</span>
+                    <span className="network-tag">{networkName || "Detecting..."}</span>
+                  </div>
 
-          <p>
-            <strong>Email:</strong>{" "}
-            {loggedInUser.email}
-          </p>
+                  <div className="wallet-field">
+                    <span className="field-label">Wallet Address</span>
+                    <div className="address-container">
+                      <span className="address-text" title={walletAddress}>
+                        {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn-copy-address"
+                        onClick={handleCopyAddress}
+                      >
+                        {copiedAddress ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
 
-          <button onClick={handleLogout}>
-            Logout
-          </button>
+                  <div className="wallet-field">
+                    <span className="field-label">Account Balance</span>
+                    <div className="balance-display">
+                      <span className="balance-amount">
+                        {walletBalance !== null ? walletBalance : "Loading..."}
+                      </span>
+                      <span className="balance-unit">ETH</span>
+                    </div>
+                  </div>
+                </div>
 
+                <div className="web3-actions">
+                  <button
+                    type="button"
+                    className="btn-action btn-sign"
+                    onClick={handleSignMessage}
+                    disabled={isSigning}
+                  >
+                    {isSigning ? "Signing..." : "Sign Verification Message"}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn-action btn-refresh"
+                    onClick={() => fetchWalletDetails(walletAddress)}
+                  >
+                    Refresh Balance
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn-action btn-disconnect"
+                    onClick={disconnectWallet}
+                  >
+                    Disconnect Wallet
+                  </button>
+                </div>
+
+                {signature && (
+                  <div className="signature-box">
+                    <p className="signature-label">✓ Session Signed & Verified:</p>
+                    <code className="signature-code">
+                      {signature.slice(0, 18)}...{signature.slice(-14)}
+                    </code>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="dashboard-footer">
+            <button type="button" className="btn-logout" onClick={handleLogout}>
+              Logout Session
+            </button>
+          </div>
         </div>
       </div>
     );

@@ -203,3 +203,321 @@ button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* =========================================
+   DASHBOARD & METAMASK WEB3 STYLES
+   ========================================= */
+
+.dashboard-box {
+  max-width: 520px;
+  padding: 32px;
+}
+
+.user-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eaeaea;
+  margin-bottom: 24px;
+}
+
+.avatar-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  font-size: 22px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.user-profile-header h1 {
+  font-size: 22px;
+  text-align: left;
+  margin-bottom: 2px;
+}
+
+.user-email {
+  color: #666;
+  font-size: 14px;
+  text-align: left !important;
+  margin-bottom: 0 !important;
+}
+
+.metamask-section {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.metamask-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.metamask-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.metamask-title h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge.connected {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-badge .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+}
+
+.metamask-connect-prompt,
+.metamask-notice {
+  text-align: center;
+  padding: 12px 0;
+}
+
+.metamask-connect-prompt p,
+.metamask-notice p {
+  color: #64748b;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.btn-metamask-connect {
+  background: linear-gradient(135deg, #f6851b, #e2761b) !important;
+  color: white !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  font-size: 15px !important;
+  padding: 12px 20px !important;
+  box-shadow: 0 4px 14px rgba(246, 133, 27, 0.35) !important;
+  transition: all 0.2s ease !important;
+  margin: 0 !important;
+  width: 100% !important;
+}
+
+.btn-metamask-connect:hover {
+  background: linear-gradient(135deg, #e2761b, #d96b14) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(246, 133, 27, 0.45) !important;
+}
+
+.btn-metamask-install {
+  display: inline-block;
+  background: #f6851b;
+  color: white;
+  text-decoration: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.wallet-card {
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.wallet-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.wallet-field:not(:last-child) {
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.field-label {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.network-tag {
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #bfdbfe;
+}
+
+.address-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.address-text {
+  font-family: monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.btn-copy-address {
+  width: auto !important;
+  margin: 0 !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 6px !important;
+}
+
+.btn-copy-address:hover {
+  background: #e2e8f0 !important;
+}
+
+.balance-display {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.balance-amount {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.balance-unit {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.web3-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.btn-action {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  font-size: 13px !important;
+  border-radius: 6px !important;
+  font-weight: 600 !important;
+}
+
+.btn-sign {
+  grid-column: span 2;
+  background: #667eea !important;
+  color: white !important;
+}
+
+.btn-sign:hover {
+  background: #5568d8 !important;
+}
+
+.btn-refresh {
+  background: #f1f5f9 !important;
+  color: #334155 !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+.btn-refresh:hover {
+  background: #e2e8f0 !important;
+}
+
+.btn-disconnect {
+  background: #fef2f2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fecaca !important;
+}
+
+.btn-disconnect:hover {
+  background: #fee2e2 !important;
+}
+
+.signature-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-top: 12px;
+  text-align: left;
+}
+
+.signature-label {
+  font-size: 12px;
+  color: #166534;
+  font-weight: 600;
+  margin-bottom: 4px !important;
+  text-align: left !important;
+}
+
+.signature-code {
+  font-family: monospace;
+  font-size: 12px;
+  color: #15803d;
+  word-break: break-all;
+}
+
+.web3-error-banner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 8px 12px;
+  border-radius: 6px;
+  color: #991b1b;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.dashboard-footer {
+  margin-top: 10px;
+}
+
+.btn-logout {
+  background: #ef4444 !important;
+  color: white !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 12px !important;
+  border-radius: 8px !important;
+  font-size: 15px !important;
+}
+
+.btn-logout:hover {
+  background: #dc2626 !important;
+}
+
