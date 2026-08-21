@@ -1,9 +1,20 @@
 import { useState,useEffect } from "react";
 import axios from "axios";
+import { ethers } from "ethers";
 import "./App.css";
 
 function App() {
   const API_URL = "https://login-page-phi-sepia.vercel.app";
+  const ROSARIO_TOKEN_ADDRESS =
+  "0x5aEcae526872e40dFc3C478e40fCE2Ab814090E4";
+
+const ROSARIO_TOKEN_ABI = [
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)",
+  "function balanceOf(address) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)"
+];
 
   // =========================
   // STATE
@@ -32,6 +43,14 @@ function App() {
 
   const [walletAddress, setWalletAddress] = useState("");
   const [walletBalance, setWalletBalance] = useState(null);
+  const [rosBalance, setRosBalance] = useState(null);
+  const [rosSymbol, setRosSymbol] = useState("ROS");
+
+const [recipientAddress, setRecipientAddress] = useState("");
+const [rosAmount, setRosAmount] = useState("");
+
+const [isSendingROS, setIsSendingROS] = useState(false);
+const [rosTransactionStatus, setRosTransactionStatus] = useState("");
   const [networkName, setNetworkName] = useState("");
   const [currencySymbol, setCurrencySymbol] = useState("BNB");
   const [isMetaMaskInstalled, setIsMetaMaskInstalled] = useState(false);
@@ -96,62 +115,123 @@ function App() {
         return { name: `Chain ID: ${chainId}`, symbol: "BNB" };
     }
   };
+  const fetchWalletDetails = async (account) => {
+  if (!window.ethereum || !account) return;
+
+  try {
+    const provider = new ethers.BrowserProvider(
+      window.ethereum
+    );
+
+    // Get BNB balance
+    const balance = await provider.getBalance(account);
+
+    setWalletBalance(
+      Number(ethers.formatEther(balance)).toFixed(4)
+    );
+
+    // Get network
+    const network = await provider.getNetwork();
+
+    const chainId = "0x" + Number(network.chainId).toString(16);
+
+    const networkDetails =
+      getNetworkDetailsByChainId(chainId);
+
+    setNetworkName(networkDetails.name);
+    setCurrencySymbol(networkDetails.symbol);
+
+    // Get ROS balance
+    await fetchRosarioTokenBalance(account);
+
+  } catch (error) {
+    console.error(
+      "Error fetching wallet details:",
+      error
+    );
+  }
+};
 
   // Fetch Balance and Network details
-  const fetchWalletDetails = async (account) => {
-    if (!window.ethereum) return;
-    try {
-      const balanceHex = await window.ethereum.request({
-        method: "eth_getBalance",
-        params: [account, "latest"],
-      });
+  const fetchRosarioTokenBalance = async (account) => {
+  if (!window.ethereum || !account) return;
 
-      const balanceInWei = BigInt(balanceHex);
-      const balanceInFormatted = (Number(balanceInWei) / 1e18).toFixed(4);
-      setWalletBalance(balanceInFormatted);
+  try {
+    const provider = new ethers.BrowserProvider(
+      window.ethereum
+    );
 
-      const chainIdHex = await window.ethereum.request({
-        method: "eth_chainId",
-      });
-      const networkDetails = getNetworkDetailsByChainId(chainIdHex);
-      setNetworkName(networkDetails.name);
-      setCurrencySymbol(networkDetails.symbol);
-    } catch (err) {
-      console.error("Error fetching wallet details:", err);
+    const tokenContract = new ethers.Contract(
+      ROSARIO_TOKEN_ADDRESS,
+      ROSARIO_TOKEN_ABI,
+      provider
+    );
+
+    const balance = await tokenContract.balanceOf(account);
+
+    const decimals = await tokenContract.decimals();
+
+    const symbol = await tokenContract.symbol();
+
+    const formattedBalance = ethers.formatUnits(
+      balance,
+      decimals
+    );
+
+    setRosBalance(formattedBalance);
+    setRosSymbol(symbol);
+
+  } catch (error) {
+    console.error(
+      "Error fetching ROS balance:",
+      error
+    );
+
+    setRosBalance(null);
+  }
+};
+// =========================
+// CONNECT METAMASK
+// =========================
+
+const connectMetaMask = async () => {
+  setWeb3Error("");
+  setIsConnectingWallet(true);
+
+  if (!window.ethereum) {
+    setWeb3Error(
+      "MetaMask extension is not installed in your browser."
+    );
+    setIsConnectingWallet(false);
+    return;
+  }
+
+  try {
+    const accounts = await window.ethereum.request({
+      method: "eth_requestAccounts",
+    });
+
+    if (accounts && accounts.length > 0) {
+      const account = accounts[0];
+
+      setWalletAddress(account);
+
+      await fetchWalletDetails(account);
     }
-  };
-
-  // Connect MetaMask Wallet
-  const connectMetaMask = async () => {
-    setWeb3Error("");
-    setIsConnectingWallet(true);
-
-    if (!window.ethereum) {
-      setWeb3Error("MetaMask extension is not installed in your browser.");
-      setIsConnectingWallet(false);
-      return;
+  } catch (err) {
+    if (err.code === 4001) {
+      setWeb3Error(
+        "Connection request was cancelled in MetaMask."
+      );
+    } else {
+      setWeb3Error(
+        err.message || "Failed to connect MetaMask wallet."
+      );
     }
-
-    try {
-      const accounts = await window.ethereum.request({
-        method: "eth_requestAccounts",
-      });
-
-      if (accounts && accounts.length > 0) {
-        const primaryAccount = accounts[0];
-        setWalletAddress(primaryAccount);
-        await fetchWalletDetails(primaryAccount);
-      }
-    } catch (err) {
-      if (err.code === 4001) {
-        setWeb3Error("Connection request was cancelled in MetaMask.");
-      } else {
-        setWeb3Error(err.message || "Failed to connect MetaMask wallet.");
-      }
-    } finally {
-      setIsConnectingWallet(false);
-    }
-  };
+  } finally {
+    setIsConnectingWallet(false);
+  }
+};
 
   // Disconnect Wallet
   const disconnectWallet = () => {
@@ -482,6 +562,142 @@ function App() {
       setOtpMessage("");
     }
   };
+  const handleSendROS = async () => {
+  setRosTransactionStatus("");
+  setWeb3Error("");
+
+  if (!walletAddress) {
+    setWeb3Error("Please connect your wallet first.");
+    return;
+  }
+
+  if (!recipientAddress) {
+    setRosTransactionStatus(
+      "Please enter the recipient address."
+    );
+    return;
+  }
+
+  if (!ethers.isAddress(recipientAddress)) {
+    setRosTransactionStatus(
+      "Invalid wallet address."
+    );
+    return;
+  }
+
+  if (!rosAmount || Number(rosAmount) <= 0) {
+    setRosTransactionStatus(
+      "Please enter a valid ROS amount."
+    );
+    return;
+  }
+
+  try {
+    setIsSendingROS(true);
+
+    const provider = new ethers.BrowserProvider(
+      window.ethereum
+    );
+
+    // MetaMask account
+    const signer = await provider.getSigner();
+
+    // Connect contract with signer
+    const tokenContract = new ethers.Contract(
+      ROSARIO_TOKEN_ADDRESS,
+      ROSARIO_TOKEN_ABI,
+      signer
+    );
+
+    // Get token decimals
+    const decimals =
+      await tokenContract.decimals();
+
+    // Convert human amount to blockchain amount
+    const amount =
+      ethers.parseUnits(
+        rosAmount,
+        decimals
+      );
+
+    setRosTransactionStatus(
+      "Please confirm the transaction in MetaMask..."
+    );
+
+    // Send ROS
+    const transaction =
+      await tokenContract.transfer(
+        recipientAddress,
+        amount
+      );
+
+    setRosTransactionStatus(
+      "Transaction submitted. Waiting for confirmation..."
+    );
+
+    // Wait for blockchain confirmation
+    await transaction.wait();
+
+    setRosTransactionStatus(
+      "ROS sent successfully! 🎉"
+    );
+
+    // Clear form
+    setRecipientAddress("");
+    setRosAmount("");
+
+    // Refresh balance
+    await fetchRosarioTokenBalance(
+      walletAddress
+    );
+
+  } catch (error) {
+
+    console.error(
+      "ROS transfer error:",
+      error
+    );
+
+    if (error.code === 4001) {
+      setRosTransactionStatus(
+        "Transaction cancelled in MetaMask."
+      );
+    } else {
+      setRosTransactionStatus(
+        error.reason ||
+        error.message ||
+        "Transaction failed."
+      );
+    }
+
+  } finally {
+    setIsSendingROS(false);
+  }
+};
+const handleReceiveROS = async () => {
+  if (!walletAddress) {
+    setWeb3Error(
+      "Connect your wallet first."
+    );
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(
+      walletAddress
+    );
+
+    setRosTransactionStatus(
+      "Your wallet address has been copied. Send it to the person who wants to send you ROS."
+    );
+
+  } catch {
+    setRosTransactionStatus(
+      "Copy failed. Your address is: " +
+      walletAddress
+    );
+  }
+};
 
   // =========================
   // DASHBOARD
@@ -546,6 +762,106 @@ function App() {
             ) : (
               <div className="metamask-dashboard-content">
                 <div className="wallet-card">
+                <div className="rosario-token-card">
+
+  <div className="rosario-token-header">
+
+    <div>
+      <span className="field-label">
+        Your Token
+      </span>
+
+      <h2>Rosario Token</h2>
+    </div>
+
+    <span className="ros-token-badge">
+      ROS
+    </span>
+
+  </div>
+
+  <div className="ros-balance">
+
+    <span className="ros-balance-label">
+      ROS Balance
+    </span>
+
+    <span className="ros-balance-amount">
+      {rosBalance !== null
+        ? Number(rosBalance).toLocaleString()
+        : "0"}
+    </span>
+
+    <span className="ros-symbol">
+      ROS
+    </span>
+
+  </div>
+
+  <div className="ros-actions">
+
+    <button
+      type="button"
+      className="btn-action"
+      onClick={handleReceiveROS}
+    >
+      Receive ROS
+    </button>
+
+  </div>
+
+  <div className="ros-send-section">
+
+    <h3>Send ROS</h3>
+
+    <label>
+      Recipient Wallet Address
+    </label>
+
+    <input
+      type="text"
+      placeholder="0x..."
+      value={recipientAddress}
+      onChange={(e) =>
+        setRecipientAddress(e.target.value)
+      }
+    />
+
+    <label>
+      Amount
+    </label>
+
+    <input
+      type="number"
+      min="0"
+      step="any"
+      placeholder="Enter ROS amount"
+      value={rosAmount}
+      onChange={(e) =>
+        setRosAmount(e.target.value)
+      }
+    />
+
+    <button
+      type="button"
+      className="btn-action btn-send-ros"
+      onClick={handleSendROS}
+      disabled={isSendingROS}
+    >
+      {isSendingROS
+        ? "Sending ROS..."
+        : "Send ROS"}
+    </button>
+
+  </div>
+
+  {rosTransactionStatus && (
+    <div className="ros-status">
+      {rosTransactionStatus}
+    </div>
+  )}
+
+</div>
                   <div className="wallet-field">
                     <span className="field-label">Connected Network</span>
                     <span className="network-tag">{networkName || "Detecting..."}</span>
